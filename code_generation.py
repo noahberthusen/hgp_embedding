@@ -1,7 +1,7 @@
 from classical_code import *
 import numpy as np
 
-n = 16
+n = 20
 dv = 3 # w_c. Every bit is in this many checks
 dc = 4 # w_r. Every check has this many bits in it
 m = (n*dv)//dc
@@ -25,10 +25,9 @@ while (vs.size and cs.size):
             vs = np.delete(vs, v_ind)
             cs =np.delete(cs, c_ind)
 
-H = np.loadtxt('./ldpc_codes/16_4_3.txt', dtype=np.int8)
-
-f_name = f'./ldpc_codes/{n}_{m}_{dv}_{dc}.txt'
 # H = np.loadtxt('./ldpc_codes/16_4_3.txt', dtype=np.int8)
+
+f_name = f'./ccodes/{n}_{m}_{dv}_{dc}.txt'
 
 bit_nbhd = []
 for bit in range(n):

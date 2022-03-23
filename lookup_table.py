@@ -105,7 +105,6 @@ class LookupTable(object):
                     ver_synd_diff[i] -= 1
 
         (best_synd_diff, ver_flips) = self.hor_subset_score(hor_synd_diff, hor_weight, ver_synd_diff)
-
         best_weight = len(ver_flips) # * self.dv
         best_flips = (ver_flips, [])
 

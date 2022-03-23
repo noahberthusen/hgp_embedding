@@ -1,6 +1,6 @@
 import numpy as np
-from lookup_table import LookupTable
-from masked_lookup_table import MaskedLookupTable
+from lookup_table_cy import LookupTable, MaskedLookupTable
+# from masked_lookup_table_cy import MaskedLookupTable
 from classical_code import *
 
 class QuantumCode(object):
@@ -88,41 +88,62 @@ class QuantumCode(object):
         
         return (lookup_table.synd_weight, self.error_to_list((vv_guessed_error, cc_guessed_error)))
 
-ccode = read_code('./ldpc_codes/16_12_3_4.txt')
+"""
+# ccode = read_code('./ldpc_codes/16_12_3_4.txt')
+ccode = read_code('./ldpc_codes/36_30_5_6.txt')
 qcode = QuantumCode(ccode)
-error = ([(2, 9)], [(2, 2), (8, 10), (11, 5)])
-synd = qcode.compute_synd_matrix(error)
 
 
-sum = 0
 num_runs = 1000
-p = 0.1
-for i in range(num_runs):
-    error = qcode.random_error(0.02)
-    # error = ([(0,0)], [])
-    synd = qcode.compute_synd_matrix(error)
-    mask = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.m) if p > np.random.uniform(0,1)]
-    # mask = [(0, 10)]
-    # mask = []
-    # print(mask)
-    # table = MaskedLookupTable(ccode, synd, mask)
-    # table = LookupTable(ccode, synd)
+mask_p = 0.3
+ps = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+# ps = [0.01]
 
-    # gen = table.find_best_gen()
-    # print(gen)
-    # print(table.lookup_table[gen[0]][gen[1]])
-    synd_weight, guessed_error = qcode.decode(synd, mask)
-    # print(synd_weight)
-    # print(mask)
-    # print(synd_weight)
-    # print(error)
-    # print(guessed_error)
-    # print()
+# ps = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]
 
-    if (not synd_weight):
-        sum += 1
+for p in ps:
+    sum = 0
 
-print(sum, (num_runs-sum)/num_runs)
+    for i in range(num_runs):
+        error = qcode.random_error(p)
+        # error = ([(0,0)], [])
+        synd = qcode.compute_synd_matrix(error)
+        mask = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.m) if mask_p > np.random.uniform(0,1)]
+        # mask = [(0, 10)]
+        # mask = []
+        # print(mask)
+        # table = MaskedLookupTable(ccode, synd, mask)
+        # table = LookupTable(ccode, synd)
+
+        # gen = table.find_best_gen()
+        # print(gen)
+        # print(table.lookup_table[gen[0]][gen[1]])
+        synd_weight, guessed_error = qcode.decode(synd, mask)
+        # print(synd_weight)
+        # print(mask)
+        # print(synd_weight)
+        # print(error)
+        # print(guessed_error)
+        # print()
+
+        passed = True
+        if (len(error[0]) == len(guessed_error[0]) and len(error[1]) == len(guessed_error[1])):
+            for vv_error in error[0]:
+                if (vv_error not in guessed_error[0]):
+                    passed = False
+            for cc_error in error[1]:
+                if (cc_error not in guessed_error[1]):
+                    passed = False
+        else:
+            passed = False
+        
+        if passed:
+            sum += 1
+
+        # if (not synd_weight):
+            # sum += 1
+
+    print(sum, (num_runs-sum)/num_runs)
 
 # table = MaskedLookupTable(ccode, synd, [])
 # synd_gen = [
@@ -132,3 +153,4 @@ print(sum, (num_runs-sum)/num_runs)
 #     [True, False, True]
 # ]
 # print(table.score_gen(synd_gen))
+"""
