@@ -1,5 +1,7 @@
 cimport cython
-
+import numpy as np
+import copy
+from collections import Counter
 
 import random
 
@@ -28,7 +30,7 @@ def compute_gray_code(dv):
 ###############################
 
 @cython.binding(True)
-cdef hor_subset_score(hor_synd_diff, hor_wweight, ver_synd_diff, dv, dc):
+def hor_subset_score(hor_synd_diff, hor_wweight, ver_synd_diff, dv, dc):
     """
     'hor' means horizontal
     'ver' means vertical
@@ -64,7 +66,7 @@ cdef hor_subset_score(hor_synd_diff, hor_wweight, ver_synd_diff, dv, dc):
     return (synd_diff,ver_flips)
 
 @cython.binding(True)
-cdef score_gen(synd_gen, synd_gen_mask, gray_code):
+def score_gen(synd_gen, synd_gen_mask, gray_code):
     """
     Input:
       'synd_gen' is a 0,1 matrix which reprensents the syndrome of the current generator
@@ -187,26 +189,41 @@ class Lookup_table:
         synd_gen_mask = [[self.mask[ver[i]][hor[j]] for j in range(self.ccode.dv)] for i in range(self.ccode.dc)]
         self.lookup_table[c1][v2] = score_gen(synd_gen, synd_gen_mask, self.gray_code)
                 
-    def find_best_gen(self):
+    def find_best_gen(self, k):
         """
-        returns the best generator to flip for the current syndrome
+        returns the best k generators to flip for the current syndrome
         """
         best_gen = None
         cdef int synd_diff = 0
         cdef int best_synd_diff = 0
         cdef int wweight = 0
         cdef int best_wweight = 1
+        gens = [(best_gen, synd_diff, best_wweight) for _ in range(k)]
+
         cdef int c1 = 0
         cdef int v2 = 0
         for c1 in range(self.ccode.m):
             for v2 in range(self.ccode.n):
                 (synd_diff,wweight,_) = self.lookup_table[c1][v2]
-                if (best_synd_diff*wweight < synd_diff*best_wweight):
-                    best_gen = (c1,v2)
-                    best_synd_diff = synd_diff
-                    best_wweight = wweight
+                for i in range(k):
+                    if (gens[i][1]*wweight < synd_diff*gens[i][2]):
+                        gen = ((c1, v2), synd_diff, wweight)
+                        gens.pop()
+                        gens.insert(i, gen)
+                        break
+                    
+                # if (best_synd_diff*wweight < synd_diff*best_wweight):
+                #     best_gen = (c1,v2)
+                #     best_synd_diff = synd_diff
+                #     best_wweight = wweight
 
-        return best_gen        
+        tmp = gens[-1]
+        while ((not tmp[0]) and gens):
+            gens.pop()
+            if (gens):
+                tmp = gens[-1]
+
+        return gens        
 
 
     # Not efficient but used few times
@@ -323,7 +340,7 @@ def xerror_to_array(ccode, xerror):
             
 
 @cython.binding(True)
-def decoder(ccode, synd_matrix, mask):
+def decoder(ccode, synd_matrix, mask, k):
     """
     Run the decoder for a given syndrome
     """
@@ -337,18 +354,88 @@ def decoder(ccode, synd_matrix, mask):
     lookup_table = Lookup_table(ccode,synd_matrix, mask, ccode.dv, ccode.dc)
 
     #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
-    gen = lookup_table.find_best_gen()
-    while gen != None:
-        (vv_qbits,cc_qbits) = lookup_table.update(gen)
-        for (v1,v2) in vv_qbits:
-            vv_guessed_xerror[v1][v2] = not vv_guessed_xerror[v1][v2]
-        for (c1,c2) in cc_qbits:
-            cc_guessed_xerror[c1][c2] = not cc_guessed_xerror[c1][c2]
-        #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
-        gen = lookup_table.find_best_gen()
-    #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+    gens = lookup_table.find_best_gen(k)
+    completed_results = []
 
-    return (lookup_table.synd_weight,xerror_to_list(ccode, (vv_guessed_xerror, cc_guessed_xerror)))
+    if gens:
+        results = [([], [], copy.deepcopy(lookup_table)) for _ in range(len(gens))]
+    else:
+        completed_results.append(([], [], lookup_table))
+
+    # print(gens)
+    while gens: 
+        gen_len = len(gens)
+        # print(gen_len)
+        for i in range(gen_len):
+            (vv_qbits, cc_qbits) = results[i][2].update(gens[i][0])
+            for (v1, v2) in vv_qbits:
+                if (v1, v2) in results[i][0]:
+                    results[i][0].remove((v1, v2))
+                else:
+                    results[i][0].append((v1, v2))
+            for (c1, c2) in cc_qbits:
+                if (c1, c2) in results[i][1]:
+                    results[i][1].remove((c1, c2))
+                else:
+                    results[i][1].append((c1, c2))
+
+            # print(i, gens[i], results[i][0])
+
+            same_error = False
+            for j in range(i):
+                if (Counter(results[i][0]) == Counter(results[j][0]) and Counter(results[i][1]) == Counter(results[j][1])):
+                    # print('seen error before')
+                    same_error = True
+                    break
+            for c in completed_results:
+                if (Counter(c[0]) == Counter(results[i][0]) and Counter(c[1]) == Counter(results[i][1])):
+                    # print('seen error before (finished)')
+                    same_error = True
+                    break
+
+            if same_error:
+                continue
+
+            tmp_gens = results[i][2].find_best_gen(k)
+            
+            if tmp_gens:
+                gens.extend(tmp_gens)
+                for g in tmp_gens:
+                    results.append(copy.deepcopy(results[i]))
+            else:
+                # print('!!!!!!!!!!!FINISHED!!!!!!!!!', results[i][0])
+                completed_results.append(copy.deepcopy(results[i]))
+
+            # print(len(gens))   
+        # print('............')
+        del gens[0: gen_len] 
+        del results[0: gen_len]
+
+        # print(len(gens), len(results), len(completed_results))
+
+    # print('--------------------------------')
+    # for res in completed_results:
+        # print(res[2].synd_weight, res[0])
+
+    completed_results.sort(key=lambda x: x[2].synd_weight)
+    completed_results = [res for res in completed_results if res[2].synd_weight == completed_results[0][2].synd_weight]
+    completed_results.sort(key=lambda x: len(x[0]) + len(x[1]))
+    res = completed_results[0]
+    # print(len(completed_results))
+    # while gen != None:
+    #     (vv_qbits,cc_qbits) = lookup_table.update(gen)
+    #     for (v1,v2) in vv_qbits:
+    #         vv_guessed_xerror[v1][v2] = not vv_guessed_xerror[v1][v2]
+    #     for (c1,c2) in cc_qbits:
+    #         cc_guessed_xerror[c1][c2] = not cc_guessed_xerror[c1][c2]
+    #     #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+    #     gen = lookup_table.find_best_gen()
+    #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+    vv_guessed_xerror = [[True if (v1, v2) in res[0] else False for v2 in range(ccode.n)] for v1 in range(ccode.n)]
+    cc_guessed_xerror = [[True if (c1, c2) in res[1] else False for c2 in range(ccode.m)] for c1 in range(ccode.m)]
+    return (res[2].synd_weight, xerror_to_list(ccode, (vv_guessed_xerror, cc_guessed_xerror)))
+
+    # return (lookup_table.synd_weight,xerror_to_list(ccode, (vv_guessed_xerror, cc_guessed_xerror)))
 
 ############ Measurements ############
 def compute_synd_matrix(ccode, xerror):
@@ -664,7 +751,16 @@ def random_error(ccode, p):
     Return a random iid error of proba 'p'
     """
     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]
-    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
+
+    return (vv_xerror, cc_xerror)
+
+def random_num_errors(ccode, num):
+    """
+    Returns a random error with num[0] VV errors and num[1] CC errors
+    """
+    vv_xerror = random.sample([(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n)], num[0])
+    cc_xerror = random.sample([(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m)], num[1])
 
     return (vv_xerror, cc_xerror)
 
@@ -677,11 +773,13 @@ def random_mask(ccode, maskp):
 
 
 # Output: 1 if corrected, 2 if non zero syndrome and 0 if logical error
-def run_algo_qcode(ccode, xerror, mask, logical2):
+def run_algo_qcode(ccode, xerror, mask, logical2, k):
     # xerror = random_error(ccode, p)
+    # xerror = random_num_errors(ccode, (10, 0))
     # mask = random_mask(ccode, maskp)
     synd_matrix = compute_synd_matrix(ccode, xerror)
-    (synd_weight,guessed_xerror) = decoder(ccode, synd_matrix, mask)
+    (synd_weight,guessed_xerror) = decoder(ccode, synd_matrix, mask, k)
+    # print(xerror)
     # print(guessed_xerror)
     if synd_weight != 0:
         return 2

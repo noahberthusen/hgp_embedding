@@ -2,7 +2,7 @@ import os.path
 import glob
 
 
-column_names_for_simulation_description = "algo,dv,dc,nv,nc,code_id,p_phys"
+column_names_for_simulation_description = "algo,dv,dc,nv,nc,code_id,p_phys,p_mask"
 column_names_for_simulation_results = "no_test,no_success,no_stop"
 column_names_for_extras = "p_log"
 # DO not use separator = ','
@@ -12,11 +12,11 @@ first_line = column_names_for_simulation_description + separator + column_names_
 
 
 class Result:
-    def __init__(self,algo,dv,dc,nv,nc,code_id,p_phys,no_test,no_success,no_stop):
+    def __init__(self,algo,dv,dc,nv,nc,code_id,p_phys,p_mask,no_test,no_success,no_stop):
         if not (type(algo) == int or type(dv) == int or\
                 type(dc) == int or type(nv) == int or\
                 type(nc) == int or type(code_id) == str or\
-                type(p_phys) == float or type(no_test) == int or\
+                type(p_phys) == float or type(p_mask) == float or type(no_test) == int or\
                 type(no_success) == int or type(no_stop) == int):
             raise NameError('Bad result format')
         self.algo = algo  # int
@@ -26,6 +26,7 @@ class Result:
         self.nc = nc  # int
         self.code_id = code_id  # str
         self.p_phys = p_phys  # float
+        self.p_mask = p_mask
         self.no_test = no_test  # int
         self.no_success = no_success  # int
         self.no_stop = no_stop  # int
@@ -34,7 +35,7 @@ class Result:
 # A line is a string
 def res_to_line(r):
     p_log = r.no_success / r.no_test
-    line = str(r.algo) + ',' + str(r.dv) + ',' + str(r.dc) + ',' + str(r.nv) + ',' + str(r.nc) + ',' + r.code_id +',' + str(r.p_phys)
+    line = str(r.algo) + ',' + str(r.dv) + ',' + str(r.dc) + ',' + str(r.nv) + ',' + str(r.nc) + ',' + r.code_id +',' + str(r.p_phys) + ',' + str(r.p_mask)
     line += separator + str(r.no_test) + ',' + str(r.no_success) + ',' + str(r.no_stop) + ','
     line += separator + str(p_log) + '\n'
     return line
@@ -43,7 +44,7 @@ def line_to_res(line):
     tmp = line.strip('\n').split(separator)
     tmp0 = tmp[0].split(',')
     tmp1 = tmp[1].split(',')
-    r = Result(int(tmp0[0]),int(tmp0[1]),int(tmp0[2]),int(tmp0[3]),int(tmp0[4]),tmp0[5],float(tmp0[6]),int(tmp1[0]),int(tmp1[1]),int(tmp1[2]))
+    r = Result(int(tmp0[0]),int(tmp0[1]),int(tmp0[2]),int(tmp0[3]),int(tmp0[4]),tmp0[5],float(tmp0[6]),float(tmp0[7]),int(tmp1[0]),int(tmp1[1]),int(tmp1[2]))
     return r
 
 # Creates a file whose lines are stored in lines_list
@@ -61,7 +62,7 @@ def create_file(file_name, lines_list):
 
 # Returns lines which match one of the possibilities.
 # e.g: algo = [], dv = [4], dc = [5], nv = [40,50] returns lines such that dv = 4 and dc = 5 and (nv = 40 or dc = 50)
-def file_to_res_list(file_name,algo=[],dv=[],dc=[],nv=[],nc=[],code_id=[],p_phys=[]):
+def file_to_res_list(file_name,algo=[],dv=[],dc=[],nv=[],nc=[],code_id=[],p_phys=[],p_mask=[]):
     file = open(file_name, 'r')
     if file.readline() != first_line:
         file.close()
@@ -82,6 +83,8 @@ def file_to_res_list(file_name,algo=[],dv=[],dc=[],nv=[],nc=[],code_id=[],p_phys
         line_list = [r for r in line_list if r.code_id in code_id]
     if len(p_phys) != 0:
         line_list = [r for r in line_list if r.p_phys in p_phys]
+    if len(p_mask) != 0:
+        line_list = [r for r in line_list if r.p_mask in p_mask]
     return line_list
 
 
@@ -93,11 +96,11 @@ def combine_res(r1,r2):
     if r1.algo == r2.algo and r1.dv == r2.dv and\
        r1.dc == r2.dc and r1.nv == r2.nv and\
        r1.nc == r2.nc and r1.code_id == r2.code_id and\
-       r1.p_phys == r2.p_phys:
+       r1.p_phys == r2.p_phys and r1.p_mask == r2.p_mask:
         no_test = r1.no_test + r2.no_test
         no_success = r1.no_success + r2.no_success
         no_stop = r1.no_stop + r2.no_stop
-        return Result(r1.algo,r1.dv,r1.dc,r1.nv,r1.nc,r1.code_id,r1.p_phys,no_test,no_success,no_stop)
+        return Result(r1.algo,r1.dv,r1.dc,r1.nv,r1.nc,r1.code_id,r1.p_phys,r1.p_mask,no_test,no_success,no_stop)
     return None
 
 

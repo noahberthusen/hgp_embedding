@@ -21,7 +21,8 @@ from distutils.core import setup
 from Cython.Build import cythonize
 
 extensions = [
-    Extension("decoder", ["decoder.pyx"], define_macros=[('CYTHON_TRACE', '1')])
+    Extension("decoder", ["decoder.pyx"], define_macros=[('CYTHON_TRACE', '1')]),
+    Extension("decoder_list", ["decoder_list.pyx"], define_macros=[('CYTHON_TRACE', '1')])
 ]
 
 setup(

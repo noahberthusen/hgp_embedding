@@ -16,6 +16,8 @@ class mat{
     mat<T>& operator=(const mat<T> & L); // Not implemented (rule of three)
     ~mat();
 
+    bool operator==(const mat<T>& rhs);
+
     void print() const;
     void print_true() const;
 
@@ -87,15 +89,32 @@ mat<T>& mat<T>::operator=(const mat<T> & L) {
     return *this;
 }
 
-    template<typename T>
-    mat<T>::~mat() {
-	for (int i = 0; i < no_rows; i++) {
-	    delete [] M[i];
-	}
-	delete [] M;
+template<typename T>
+mat<T>::~mat() {
+    for (int i = 0; i < no_rows; i++) {
+        delete [] M[i];
+    }
+    delete [] M;
+}
+
+
+// check for equality
+template<typename T>
+bool mat<T>::operator==(const mat<T>& matrix_right) {
+    if (no_rows != matrix_right.no_rows || no_cols != matrix_right.no_cols) {
+    	return false;
+    } 
+
+    for (int i = 0; i < no_rows; i++) {
+        for (int j = 0; j < no_cols; j++) {
+            if ((*this)(i,j) != matrix_right(i,j)) {
+                return false;
+            }
+        }
     }
 
-
+    return true;
+}
 
 
 // Prints the matrix beautifully

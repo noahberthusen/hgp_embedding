@@ -1,5 +1,5 @@
 cimport cython
-
+from cython.parallel cimport prange
 
 import random
 
@@ -13,7 +13,9 @@ print("----------------- Using pyx file ----------------")
 # Given a flip for the columns, it is possible to find the best flip for the lines. So we do an exhaustive search on the collumn.
 # The 'gray code' is a way to go through all the elements of {0,1}^k by flipping one bit at each step.
 
-def compute_gray_code(dv):
+@cython.binding(True)
+@cython.nogil(True)
+cdef compute_gray_code(dv):
     """
     returns the gray code
     If you begin with [0 for i in range(dv)] and flip the bits res[0], res[1], ..., res[dv-2] then you go through {0,1}^dv
@@ -28,6 +30,7 @@ def compute_gray_code(dv):
 ###############################
 
 @cython.binding(True)
+@cython.nogil(True)
 cdef hor_subset_score(hor_synd_diff, hor_wweight, ver_synd_diff, dv, dc):
     """
     'hor' means horizontal
@@ -63,7 +66,12 @@ cdef hor_subset_score(hor_synd_diff, hor_wweight, ver_synd_diff, dv, dc):
 
     return (synd_diff,ver_flips)
 
+cdef struct score_gen_res:
+    int synd_weight
+    int synd_diff
+
 @cython.binding(True)
+@cython.nogil(True)
 cdef score_gen(synd_gen, synd_gen_mask, gray_code):
     """
     Input:
@@ -123,8 +131,26 @@ cdef score_gen(synd_gen, synd_gen_mask, gray_code):
             best_synd_diff = synd_diff
             best_wweight = wweight
             best_flips = (ver_flips, [j for j in range(dv) if hor_flips_array[j]])
-            
+
+    cdef score_gen_res res  
     return (best_synd_diff,best_wweight,best_flips)
+
+@cython.binding(True)
+cdef update_score_generator(synd_matrix, mask, ccode, c1, v2) nogil:
+    """
+    compute the score of the generator 'gen'
+    """
+    cdef int i = 0
+    cdef int j = 0
+
+    gray_code = compute_gray_code(ccode.dv)
+
+    ver = ccode.check_nbhd[c1]
+    hor = ccode.bit_nbhd[v2]
+    synd_gen = [[synd_matrix[ver[i]][hor[j]] for j in range(ccode.dv)] for i in range(ccode.dc)]
+    synd_gen_mask = [[mask[ver[i]][hor[j]] for j in range(ccode.dv)] for i in range(ccode.dc)]
+    
+    return score_gen(synd_gen, synd_gen_mask, gray_code)
             
 
 ############ Tests ############
@@ -156,7 +182,7 @@ class Lookup_table:
         self.dc = dc
         
         # The weight should not be necessary but we print it
-        self.synd_weight = sum([sum(ll and mm for (ll, mm) in zip(l, m)) for (l, m) in zip(self.synd_matrix, self.mask)])
+        self.synd_weight = sum([sum(rr1 and rr2 for (rr1, rr2) in zip(r1, r2)) for (r1, r2) in zip(self.synd_matrix, self.mask)])
         self.masked_synd_weight = sum([sum(l) for l in self.synd_matrix])
         self.gray_code = compute_gray_code(dv)
 
@@ -166,27 +192,18 @@ class Lookup_table:
         self.round = 0
         self.last_update = [[self.round for v2 in range(self.ccode.n)] for c1 in range(self.ccode.m)]
 
-        self.lookup_table = [[(0,0,([],[])) for v2 in range(self.ccode.n)] for c1 in range(self.ccode.m)]
-        for c1 in range(self.ccode.m):
-            for v2 in range(self.ccode.n):
-                self.update_score_generator((c1,v2))
-
-    @cython.binding(True)
-    def update_score_generator(self,gen):
-        """
-        compute the score of the generator 'gen'
-        """
-        cdef int c1 = 0
-        cdef int v2 = 0
-        cdef int i = 0
-        cdef int j = 0
-        (c1,v2) = gen
-        ver = self.ccode.check_nbhd[c1]
-        hor = self.ccode.bit_nbhd[v2]
-        synd_gen = [[self.synd_matrix[ver[i]][hor[j]] for j in range(self.ccode.dv)] for i in range(self.ccode.dc)]
-        synd_gen_mask = [[self.mask[ver[i]][hor[j]] for j in range(self.ccode.dv)] for i in range(self.ccode.dc)]
-        self.lookup_table[c1][v2] = score_gen(synd_gen, synd_gen_mask, self.gray_code)
+        lookup_table = [[(0,0,([],[])) for v2 in range(self.ccode.n)] for c1 in range(self.ccode.m)]
+        
+        cdef int m = self.ccode.m
+        cdef int n = self.ccode.n
+        for c1 in prange(m, nogil=True):
+            for v2 in prange(n):
+                res = update_score_generator(synd_matrix, mask, ccode, c1, v2)
+                with gil:
+                    lookup_table[c1][v2] = res
+        self.lookup_table = lookup_table
                 
+
     def find_best_gen(self):
         """
         returns the best generator to flip for the current syndrome
@@ -282,7 +299,7 @@ class Lookup_table:
             for v2 in self.ccode.check_nbhd[c2]:
                 for c1 in self.ccode.bit_nbhd[v1]:
                     if self.last_update[c1][v2] != self.round:
-                        self.update_score_generator((c1,v2))
+                        self.lookup_table = update_score_generator(self.synd_matrix, self.mask, self.ccode, c1, v2)
                         self.last_update[c1][v2] = self.round
 
         return self.compute_qbits(gen, flips)        
@@ -664,7 +681,7 @@ def random_error(ccode, p):
     Return a random iid error of proba 'p'
     """
     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]
-    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
 
     return (vv_xerror, cc_xerror)
 
@@ -677,9 +694,9 @@ def random_mask(ccode, maskp):
 
 
 # Output: 1 if corrected, 2 if non zero syndrome and 0 if logical error
-def run_algo_qcode(ccode, xerror, mask, logical2):
-    # xerror = random_error(ccode, p)
-    # mask = random_mask(ccode, maskp)
+def run_algo_qcode(ccode, p, maskp, logical2):
+    xerror = random_error(ccode, p)
+    mask = random_mask(ccode, maskp)
     synd_matrix = compute_synd_matrix(ccode, xerror)
     (synd_weight,guessed_xerror) = decoder(ccode, synd_matrix, mask)
     # print(guessed_xerror)

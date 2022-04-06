@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string>
 #include <ctime>
+#include <chrono>
 
 #include "qcode.h"
 #include "decoder.h"
@@ -27,14 +28,23 @@ mat<bool> generate_errors(double (p), int t) {
     mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
     bernoulli_distribution dis(p);
     for (int a = 0; a < t; a++) {
-	for (int b = 0; b < t; b++) {
-	    r1 = dis(gen);
-	    if (r1 == 1) {
-		errors(a,b) = 1;
-	    }
-	}
+        for (int b = 0; b < t; b++) {
+            r1 = dis(gen);
+            if (r1 == 1) {
+                errors(a,b) = 1;
+            }
+        }
     }
+    // (0,15) (6,1) (6,13)
+    // errors(0,15) = 1;
+    // errors(6,1) = 1;
+    // errors(6,13) = 1;
 
+    return errors;
+}
+
+mat<bool> cc(int t) {
+    mat<bool> errors(t,t,0);
     return errors;
 }
 
@@ -78,13 +88,13 @@ int main(int argc, char * argv[]) {
     vector<int> dv_vector = {};
     vector<int> dc_vector = {};
     // Use quotes !
-    // vector<string> id_vector = {};
+    vector<string> id_vector = {};
     // vector<string> id_vector = {"swap_1a33b842", "swap_6822f6e8","swap_adc9817d"};
     // vector<string> id_vector = {"swap_84f2e5cd"};
     // vector<string> id_vector = {"swac_7sxu71qo", "swac_gahdc3t2", "swac_4pi117ny"};
     // vector<string> id_vector = {"swac_4pi117ny"};
     // vector<string> id_vector = {"swac_3bs3ixvl", "swac_7sxu71qo", "swac_gahdc3t2"};
-    vector<string> id_vector = {"swac_4pi117ny"};
+    // vector<string> id_vector = {"swac_4pi117ny"};
     // vector<string> id_vector = {"swac_zxe5e53k", "swac_aa0e3did", "swac_3bs3ixvl", "swac_7sxu71qo", "swac_gahdc3t2","swac_4pi117ny"};
     // vector<string> id_vector = {"swap_12f5a4a2", "swap_82698d8d", "swap_2e55c0b2", "swap_54d39ebd"};
     // vector<string> id_vector = {"swap_07d96dd9"};
@@ -94,10 +104,10 @@ int main(int argc, char * argv[]) {
     // vector<double> p {0.01};
     vector<double> proba_vector;
     for (int k = 1; k < 2; ++k) {
-	proba_vector.push_back(k*0.045);
+	    proba_vector.push_back(k*0.04);
     }
     
-    int no_test = 1000000;
+    int no_test = 1000;
     /////////////////////////////////////////
     /////////////////////////////////////////
     /////////////////////////////////////////
@@ -115,33 +125,33 @@ int main(int argc, char * argv[]) {
     int rand_seed = 0;
     
     while((c = getopt(argc, argv, "o:t:n:"))!= -1){
-	switch(c) {
-	case 'n':
-	    if(optarg) rand_seed = stoi(optarg);
-	    break;
-	case 'o':
-	    if(optarg) res_file_name = string(optarg);
-	    break;
-	case 't':
-	    if(optarg) delay_saving = stoi(optarg);
-	    // case 'i':
-	    //     code_file_name_array = &(argv[optind]);
-	    //     no_code_file = 0;
-	    //     while(optind < argc){
-	    // 	if(argv[optind][0] != '-'){
-	    // 	    optind++;
-	    // 	    no_code_file++;
-	    // 	}
-	    // 	else {
-	    // 	    break;
-	    // 	}
-	    //     }
-	    // break;	    
-	}
+        switch(c) {
+            case 'n':
+                if(optarg) rand_seed = stoi(optarg);
+                break;
+            case 'o':
+                if(optarg) res_file_name = string(optarg);
+                break;
+            case 't':
+                if(optarg) delay_saving = stoi(optarg);
+                // case 'i':
+                //     code_file_name_array = &(argv[optind]);
+                //     no_code_file = 0;
+                //     while(optind < argc){
+                // 	if(argv[optind][0] != '-'){
+                // 	    optind++;
+                // 	    no_code_file++;
+                // 	}
+                // 	else {
+                // 	    break;
+                // 	}
+                //     }
+                // break;	    
+        }
     }
 
     if (optind == argc) {
-	throw invalid_argument("No input file given");
+	    throw invalid_argument("No input file given");
     }
     int no_code_file = argc - optind;
     char const * const * code_file_name_array = &(argv[optind]);
@@ -166,51 +176,73 @@ int main(int argc, char * argv[]) {
     
     ifstream file(res_file_name);
     if (file.fail())
-	res_ens.to_file(res_file_name);
+	    res_ens.to_file(res_file_name);
     else
-	file.close();
+	    file.close();
     
     res_ens.add_file(res_file_name);
     time_t last_saving;
+    auto start = chrono::high_resolution_clock::now();
     time(&last_saving);
     ///////////////////////////////////////
 	
     for (int r = 0; r < no_test; r++) {
-	for (int proba_ind = 0; proba_ind < int(proba_vector.size()); ++ proba_ind) {
-	    double p = proba_vector[proba_ind];
-	    for (int code_ind = 0; code_ind < no_codes; code_ind++) {
-		qcode* Q_ptr = Q_ens.get_qcode_ptr(code_ind);
-				
-		mat<bool> vv_errors = generate_errors(p, Q_ptr->n);
-		mat<bool> cc_errors = generate_errors(p, Q_ptr->m);
+        for (int proba_ind = 0; proba_ind < int(proba_vector.size()); ++ proba_ind) {
+            double p = proba_vector[proba_ind];
+            for (int code_ind = 0; code_ind < no_codes; code_ind++) {
+                qcode* Q_ptr = Q_ens.get_qcode_ptr(code_ind);
+                        
+                mat<bool> vv_errors = generate_errors(p, Q_ptr->n);
+                // mat<bool> vv_errors = cc(Q_ptr->n);
 
-#if flip_flag
-		flip flp(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
-		flp.compute_syndrome_matrix_ptr(vv_errors, cc_errors);
-		flp.decode();
+                // mat<bool> cc_errors = generate_errors(p, Q_ptr->m);
+                mat<bool> cc_errors = cc(Q_ptr->m);
 
-		vv_errors = *flp.vv_qbits_ptr ^ vv_errors;
-		cc_errors = *flp.cc_qbits_ptr ^ cc_errors;
-#endif
+        // #if flip_flag
+        //         flip flp(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+        //         flp.compute_syndrome_matrix_ptr(vv_errors, cc_errors);
+        //         flp.decode();
 
-		Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
-		dec.decode(vv_errors, cc_errors);
+        //         vv_errors = *flp.vv_qbits_ptr ^ vv_errors;
+        //         cc_errors = *flp.cc_qbits_ptr ^ cc_errors;
+        // #endif
 
-		mat<bool> final_vv_errors = dec.get_vv_correction() ^ vv_errors;
-		mat<bool> final_cc_errors = dec.get_cc_correction() ^ cc_errors;
+                Decoder dec_list(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+                Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
 
-		if (dec.get_synd_weight() != 0) {
-		    res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, 0, 1);
-		}
-		else {
-		    int success = Q_ptr->is_stabilizer(final_vv_errors,final_cc_errors);
-		    res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, success, 0);
-		}
-		if (difftime(time(NULL),last_saving) > delay_saving) {
-		    time(&last_saving);
-		    res_ens.to_file(res_file_name);
-		}
-	    }
-	}
+
+                dec_list.decode_list(vv_errors, cc_errors, 1);
+
+                // dec.decode(vv_errors, cc_errors);
+                // dec.get_vv_correction().print_true();
+                // vv_errors.print_true();
+
+                // vv_errors.print_true();
+                // cc_errors.print_true();
+
+                // mat<bool> final_vv_errors = dec.get_vv_correction() ^ vv_errors;
+                // mat<bool> final_cc_errors = dec.get_cc_correction() ^ cc_errors;
+
+                // if (dec.get_synd_weight() != 0) {
+                //     res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, 0, 1);
+                // }
+                // else {
+                //     int success = Q_ptr->is_stabilizer(final_vv_errors,final_cc_errors);
+                //     res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, success, 0);
+                // }
+                // res_ens.to_file(res_file_name);
+
+
+                // if (difftime(time(NULL),last_saving) > delay_saving) {
+                //     time(&last_saving);
+                //     res_ens.to_file(res_file_name);
+                // }
+            }
+        }
     }
+    
+    auto stop = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+ 
+    cout << duration.count() << endl;
 }

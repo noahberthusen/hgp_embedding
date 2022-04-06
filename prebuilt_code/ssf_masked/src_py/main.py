@@ -1,7 +1,8 @@
 import sys
 import default_names
 from print_erase import*
-from decoder import run_algo_qcode, Logical2
+import decoder_list
+import decoder
 from read_ccodes import read_ccode
 from read_result import Result, save_new_res
 # import resource
@@ -24,16 +25,20 @@ dc_list = []
 # id_list = ["swap_566a5203","swap_21c6740d","swap_ca41e16b","swap_a501cc2e","swap_12f5a4a2", "swap_82698d8d", "swap_2e55c0b2", "swap_877f956a", "swap_54d39ebd", "swap_b5f4dc91","swap_c9cc9a21","swap_5ca99d9d","swap_3975e341","swap_dee99e3d","swap_8cab59e4", "swap_48aae4fa","swap_24daeba6","swap_0c8ee978","swap_3deb9a09","swap_48aae4fa","swap_93d4cf34"]
 # id_list = ["swap_ede32c1d","swap_6fb0da08"]
 id_list = []
+# file_name_list = ["../ccode/60_50_5_6.code"]
+# file_name_list = ["../ccode/swap3_120_100_5_6.code"]
 file_name_list = ["../ccode/16_12_3_4.code"]
+
 ###########################################################
 # Simulation parameters
 ###########################################################
 # Change this value for another algorithm (for example for the parallel version)
-algo = 0
+algo = 2
 # P = [0.0025 * k for k in range(15,16)]
 # P = [0.05,0.06,0.07]
-P = [0.01, 0.015, 0.02, 0.025]
-no_runs = 1000
+P = [0.015]
+maskP = [0]
+no_runs = 5
 ###########################################################
 
 
@@ -53,12 +58,14 @@ def is_quantum(algo):
 # This function chooses the decoding algorithm.
 # Input: 'algo' is the algorithm to run; 'ccode' is the classical code we use; 'p' is the probability of flip; 'logical2' is an object of the class 'Logical2' used to test logical errors
 # Output: 1 if corrected, 2 if non zero syndrome and 0 if logical error
-def run_algo(algo, ccode, p, logical2):
+def run_algo(algo, ccode, p, maskp, logical2):
     # Bit-flip on classical code
     if algo == 0 or algo == -1:
-        return run_flip_ccode(ccode,p, algo)
+        return run_flip_ccode(ccode, p, algo)
     elif algo == 1:
-        return run_algo_qcode(ccode, p, logical2)
+        return decoder.run_algo_qcode(ccode, p, maskp, logical2)
+    elif algo == 2:
+        return decoder_list.run_algo_qcode(ccode, p, maskp, logical2, 3)
     else:
         raise NameError('This algo number does not exist')
 
@@ -68,7 +75,6 @@ def main_laptop():
     start = time.time()
     code_list = read_ccode(file_name_list, n_list, m_list, dv_list, dc_list, id_list)
     # code_list = code_list[:no_codes]
-    
     if len(code_list) == 0:
         raise NameError('No such code')
     
@@ -76,7 +82,7 @@ def main_laptop():
 
         ccode = code_list[i]
         if is_quantum(algo):
-            logical2 = Logical2(ccode)
+            logical2 = decoder.Logical2(ccode)
         else:
             logical2 = None
         
@@ -84,24 +90,25 @@ def main_laptop():
         print("Code " + str(i+1) + s)
 
         for p in P:
-            print_erase = Print_erase(0)
-            no_success = 0
-            no_stop = 0
-            for test in range(no_runs):
-                print_erase.print(str(p*100) + " % : " + "Run number: " + str(test+1) + "/" + str(no_runs) + "\tResult: " + str(no_success) + " (" + str(no_stop) + " :synd != 0)")
-                res = run_algo(algo, ccode, p, logical2)
-                if res == 2:
-                    r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,1,0,1)
-                else:
-                    r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,1,res,0)
-                no_stop = no_stop + r.no_stop
-                no_success = no_success + r.no_success
-                save_new_res(args.o, [r])
-                
-        
-            print_erase.print("Final result for " + str(p*100) + " % : "
-                              + str(no_success) + "/" + str(no_runs) + " (" + str(no_stop) + " :synd != 0)")
-            del print_erase
+            for p_mask in maskP:
+                print_erase = Print_erase(0)
+                no_success = 0
+                no_stop = 0
+                for test in range(no_runs):
+                    print_erase.print(str(p*100) + "% " + str(p_mask*100) + "% : " + "Run number: " + str(test+1) + "/" + str(no_runs) + "\tResult: " + str(no_success) + " (" + str(no_stop) + " :synd != 0)")
+                    res = run_algo(algo, ccode, p, p_mask, logical2)
+                    if res == 2:
+                        r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,p_mask,1,0,1)
+                    else:
+                        r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,p_mask,1,res,0)
+                    no_stop = no_stop + r.no_stop
+                    no_success = no_success + r.no_success
+                    save_new_res(args.o, [r])
+                    
+            
+                print_erase.print("Final result for " + str(p*100) + "% " + str(p_mask*100) + "% : "
+                                + str(no_success) + "/" + str(no_runs) + " (" + str(no_stop) + " :synd != 0)")
+                del print_erase
             
     stop = time.time()
     print("Time taken: " + str(stop - start) + "\n")

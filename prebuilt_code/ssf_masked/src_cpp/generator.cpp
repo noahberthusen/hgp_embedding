@@ -39,7 +39,7 @@ generator::generator(int C1, int V2, int DC, int DV) :
 
     col_flips = new bool[dv];
     for (int i = 0; i < dc; i++) {
-        rows_flips[i] = 0;
+        col_flips[i] = 0;
     }
 
     rows_synd_diff = new int[dc];
@@ -52,12 +52,42 @@ generator::generator(int C1, int V2, int DC, int DV) :
 }
 
 
-generator::generator(const generator&){
-    throw invalid_argument("Not implemented: trying to copy a generator");
+generator::generator(const generator& gen) :
+    c1(gen.c1), v2(gen.v2), dc(gen.dc), dv(gen.dv), 
+    best_synd_diff(gen.best_synd_diff), best_weight(gen.best_weight),
+    col_synd_diff(gen.col_synd_diff), col_weight(gen.col_weight),
+    synd_diff(gen.synd_diff), wt_rows_flips(gen.wt_rows_flips) {
+    
+    rows_flips = new bool[dc];
+    for (int i = 0; i < dc; i++) {
+        rows_flips[i] = gen.rows_flips[i];
+    }
+
+    col_flips = new bool[dv];
+    for (int i = 0; i < dc; i++) {
+        col_flips[i] = gen.col_flips[i];
+    }
+
+    rows_synd_diff = new int[dc];
+    for (int i = 0; i < dc; i++) {
+        rows_synd_diff[i] = gen.rows_synd_diff[i];
+    }
+
+    best_col_flips = new bool[dv];
+    for (int i = 0; i < dv; i++) {
+        best_col_flips[i] = gen.best_col_flips[i];
+    }
+
+    best_rows_flips = new bool[dc];
+    for (int i = 0; i < dc; i++) {
+        best_rows_flips[i] = gen.best_rows_flips[i];
+    }
+
+    synd_gen_ptr = new mat<bool>(dc,dv,false);
 }
 
-generator generator::operator=(const generator&){
-    throw invalid_argument("Not implemented: trying to copy a generator");
+generator generator::operator=(const generator& gen){
+    return generator(gen);
 }
 
 generator::~generator() {
@@ -106,10 +136,14 @@ void generator::score_gen(const int* gray_code,
 			  const mat<bool>& synd_matrix) {
     
     for (int i = 0; i < dc; i++) {
-	for (int j = 0; j < dv; j++) {
-	    (*synd_gen_ptr)(i,j) = synd_matrix(check_nbhd(c1,i),bit_nbhd(v2,j));
-	}
+        for (int j = 0; j < dv; j++) {
+            // cout << "begin here?" << endl;
+            bool check = synd_matrix(check_nbhd(c1,i),bit_nbhd(v2,j));
+            // cout << "here?" << endl;
+            (*synd_gen_ptr)(i,j) = check;
+        }
     }
+    // cout << "in score gen" << endl;
 
     col_weight = 0;
     for (int i = 0; i < dv; i++) {
@@ -118,8 +152,8 @@ void generator::score_gen(const int* gray_code,
     
     for (int i = 0; i < dc; i++) {
         rows_synd_diff[i] = 0;
-        for (int j = 0; j < dv; j++) {
-	    rows_synd_diff[i] = rows_synd_diff[i] + 2*(*synd_gen_ptr)(i,j) - 1;
+        for (int j = 0; j < dv; j++) { // put mask here
+	        rows_synd_diff[i] = rows_synd_diff[i] + 2*(*synd_gen_ptr)(i,j) - 1;
         }
     }
 
@@ -129,6 +163,7 @@ void generator::score_gen(const int* gray_code,
     update_best();
 
     int size_gray = pow(2,dv) - 1;
+
 #if (!sampling_flag) 
     for (int i = 0; i < size_gray; i++) {
 	int j = gray_code[i];
@@ -139,10 +174,11 @@ void generator::score_gen(const int* gray_code,
 	int ind = (rand() % static_cast<int>(size_gray));
 	int j = gray_code[ind];
 #endif
+
 	int a = (1-2*col_flips[j]);
 	col_weight = col_weight + a;
 	col_flips[j] = col_flips[j] + a;
-	for (int i = 0; i < dc; i++) {
+	for (int i = 0; i < dc; i++) { // put mask here
 	    rows_synd_diff[i] = rows_synd_diff[i] - a*4*(*synd_gen_ptr)(i,j) + a*2;
 	    col_synd_diff = col_synd_diff + a*2*(*synd_gen_ptr)(i,j) - a;
 	}
@@ -156,6 +192,8 @@ void generator::score_gen(const int* gray_code,
 #endif
 	}
     }
+
+    // cout << "end score gen" << endl;
 }
 
 // Computes the best rows to flip for the current flip of collumns

@@ -5,6 +5,8 @@
 #include "input_params.h"
 #include "generator.h"
 #include <math.h>
+#include <vector>
+#include <tuple>
 
 using namespace std;
 
@@ -84,9 +86,11 @@ class Decoder {
     Decoder(int N, int M, int DV, int DC, mat<int> const * CHECK_NBHD, mat<int> const * BIT_NBHD);
     Decoder(const Decoder& dec); // Not implemented (rule of three)
     Decoder operator=(const Decoder& dec); // Not implemented (rule of three)
+    bool operator==(const Decoder& dec);
     ~Decoder();
     
     void decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors);
+    void decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, int k);
     int get_synd_weight();
     const mat<bool>& get_vv_correction();
     const mat<bool>& get_cc_correction();
@@ -107,17 +111,16 @@ class Decoder {
     int round;
     mat<int>* last_update_ptr; // (*last_update_ptr)(c1,v2) is the last round we have updated (*lookup_table_ptr)(c1,v2)
 
-
+    vector<tuple<int,int>> best_gen_indices; // indices best k generators to flip.
     int best_gen[2]; // = (c1,v2) representing the best generator to flip
-        
     mat<bool>* synd_matrix_ptr; // n x m matrix
 
     mat<bool>* vv_qbits_ptr; // n x n matrix representing vv guessed error
     mat<bool>* cc_qbits_ptr; // m x m matrix representing cc guessed error
     
-    void compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errors);
+    void compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errorsm);
     void find_best_gen(); // computes the best generator to flip for the current syndrome
-    
+    void find_best_gen(int k); // computes the best k generators to flip for the current syndrome
     void update(int c1, int v2); // Calls the three following update functions in the right order when flipping generator (c1,v2)
     void update_synd_matrix(int c1, int v2); // Updates synd_matrix when flipping generator (c1,v2)
     void update_qbits_flips(int c1, int v2); // Updates vv/cc_qbits when flipping generator (c1,v2)

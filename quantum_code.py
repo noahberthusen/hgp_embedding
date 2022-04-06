@@ -88,18 +88,18 @@ class QuantumCode(object):
         
         return (lookup_table.synd_weight, self.error_to_list((vv_guessed_error, cc_guessed_error)))
 
-"""
-# ccode = read_code('./ldpc_codes/16_12_3_4.txt')
-ccode = read_code('./ldpc_codes/36_30_5_6.txt')
+
+ccode = read_code('./ccodes/16_12_3_4.txt')
+# ccode = read_code('./ccodes/36_30_5_6.txt')
 qcode = QuantumCode(ccode)
 
 
 num_runs = 1000
-mask_p = 0.3
-ps = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
+mask_p = 0.2
+# ps = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]
 # ps = [0.01]
 
-# ps = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]
+ps = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]
 
 for p in ps:
     sum = 0
@@ -143,7 +143,7 @@ for p in ps:
         # if (not synd_weight):
             # sum += 1
 
-    print(sum, (num_runs-sum)/num_runs)
+    print(sum/num_runs)
 
 # table = MaskedLookupTable(ccode, synd, [])
 # synd_gen = [
@@ -153,4 +153,3 @@ for p in ps:
 #     [True, False, True]
 # ]
 # print(table.score_gen(synd_gen))
-"""
