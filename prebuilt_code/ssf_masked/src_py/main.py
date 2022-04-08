@@ -36,9 +36,10 @@ file_name_list = ["../ccode/16_12_3_4.code"]
 algo = 2
 # P = [0.0025 * k for k in range(15,16)]
 # P = [0.05,0.06,0.07]
-P = [0.015]
-maskP = [0]
-no_runs = 5
+P = [0.005, 0.01, 0.015, 0.02, 0.025]#, 0.03]
+# P = [0.01,0.02,0.03,0.04,0.05]
+maskP = [0.1]
+no_runs = 1000
 ###########################################################
 
 
@@ -58,14 +59,14 @@ def is_quantum(algo):
 # This function chooses the decoding algorithm.
 # Input: 'algo' is the algorithm to run; 'ccode' is the classical code we use; 'p' is the probability of flip; 'logical2' is an object of the class 'Logical2' used to test logical errors
 # Output: 1 if corrected, 2 if non zero syndrome and 0 if logical error
-def run_algo(algo, ccode, p, maskp, logical2):
+def run_algo(algo, ccode, error, mask, logical2, k):
     # Bit-flip on classical code
     if algo == 0 or algo == -1:
-        return run_flip_ccode(ccode, p, algo)
+        return run_flip_ccode(ccode, 0.05, algo)
     elif algo == 1:
-        return decoder.run_algo_qcode(ccode, p, maskp, logical2)
+        return decoder.run_algo_qcode(ccode, error, mask, logical2)
     elif algo == 2:
-        return decoder_list.run_algo_qcode(ccode, p, maskp, logical2, 3)
+        return decoder_list.run_algo_qcode(ccode, error, mask, logical2, k)
     else:
         raise NameError('This algo number does not exist')
 
@@ -74,6 +75,7 @@ def run_algo(algo, ccode, p, maskp, logical2):
 def main_laptop():
     start = time.time()
     code_list = read_ccode(file_name_list, n_list, m_list, dv_list, dc_list, id_list)
+    rs = []
     # code_list = code_list[:no_codes]
     if len(code_list) == 0:
         raise NameError('No such code')
@@ -94,16 +96,20 @@ def main_laptop():
                 print_erase = Print_erase(0)
                 no_success = 0
                 no_stop = 0
+                rs = []
                 for test in range(no_runs):
+                    error = decoder.random_error(ccode, p)
+                    mask = decoder.random_mask(ccode, p_mask)
                     print_erase.print(str(p*100) + "% " + str(p_mask*100) + "% : " + "Run number: " + str(test+1) + "/" + str(no_runs) + "\tResult: " + str(no_success) + " (" + str(no_stop) + " :synd != 0)")
-                    res = run_algo(algo, ccode, p, p_mask, logical2)
+                    res = run_algo(1, ccode, error, mask, logical2, 2)
                     if res == 2:
                         r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,p_mask,1,0,1)
                     else:
                         r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,p_mask,1,res,0)
                     no_stop = no_stop + r.no_stop
                     no_success = no_success + r.no_success
-                    save_new_res(args.o, [r])
+                    rs.append(r)
+                save_new_res(args.o, rs)
                     
             
                 print_erase.print("Final result for " + str(p*100) + "% " + str(p_mask*100) + "% : "

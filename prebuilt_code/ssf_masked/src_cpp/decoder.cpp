@@ -1,6 +1,7 @@
 #include "decoder.h"
 #include <algorithm>
-#include <deque>
+#include <omp.h>
+#include <chrono>
 
 void compute_gray_code(int* gray_code, int begin, int end, int dv) {
     /*
@@ -40,15 +41,19 @@ Decoder::Decoder(int N, int M, int DV, int DC, mat<int> const * CHECK_NBHD_PTR, 
     }
 
     synd_weight = 0;
+    correction_weight = 0;
 
     vv_qbits_ptr = new mat<bool>(n,n,false);
 
     cc_qbits_ptr = new mat<bool>(m,m,false);
+
+    synd_mask_ptr = new mat<bool>(n,m,true);
 }
 
 
 Decoder::Decoder(const Decoder& dec) :
-    n(dec.n), m(dec.m), dc(dec.dc), dv(dec.dv), size_gray(dec.size_gray), synd_weight(dec.synd_weight), round(dec.round) { // deep copy
+    n(dec.n), m(dec.m), dc(dec.dc), dv(dec.dv), size_gray(dec.size_gray), 
+    synd_weight(dec.synd_weight), correction_weight(dec.correction_weight), round(dec.round) { // deep copy
     vv_qbits_ptr = new mat<bool>(*dec.vv_qbits_ptr);
     cc_qbits_ptr = new mat<bool>(*dec.cc_qbits_ptr);
 
@@ -68,12 +73,10 @@ Decoder::Decoder(const Decoder& dec) :
     bit_nbhd_ptr = new mat<int>(*dec.bit_nbhd_ptr);
     synd_matrix_ptr = new mat<bool>(*dec.synd_matrix_ptr);
     last_update_ptr = new mat<int>(*dec.last_update_ptr);
+    synd_mask_ptr = new mat<bool>(*dec.synd_mask_ptr);
 
-    // best_gen_indices = dec.best_gen_indices;
-    // vector<int> best_gen_indices(dec.best_gen_indices);
     best_gen_indices = vector<tuple<int, int>>(0);
     for (size_t i = 0; i < dec.best_gen_indices.size(); i++) {
-        tuple<int, int> tmp(get<0>(dec.best_gen_indices[i]), get<1>(dec.best_gen_indices[i]));
         best_gen_indices.push_back(make_tuple(get<0>(dec.best_gen_indices[i]), get<1>(dec.best_gen_indices[i])));
     }
 }
@@ -87,6 +90,17 @@ bool Decoder::operator==(const Decoder& dec) {
     // will behave the same if they have the same syndrome matrices (or maybe guessed errors)
     // return synd_matrix_ptr == dec.synd_matrix_ptr;
     return (*vv_qbits_ptr == *dec.vv_qbits_ptr && *cc_qbits_ptr == *dec.cc_qbits_ptr);
+}
+
+bool operator==(const Decoder& lhs, const Decoder& rhs) {
+    return (*lhs.vv_qbits_ptr == *rhs.vv_qbits_ptr && *lhs.cc_qbits_ptr == *rhs.cc_qbits_ptr);
+}
+
+bool Decoder::operator< (const Decoder& dec) {
+    if (synd_weight == dec.synd_weight)
+        return correction_weight < dec.correction_weight;
+    else
+        return synd_weight < dec.synd_weight;
 }
 
 
@@ -103,6 +117,7 @@ Decoder::~Decoder() {
     delete lookup_table_ptr;
     delete synd_matrix_ptr;
     delete last_update_ptr;
+    delete synd_mask_ptr;
     delete[] gray_code;
 }
 
@@ -120,8 +135,9 @@ int Decoder::get_synd_weight(){
     return synd_weight;
 }
 
-
-
+int Decoder::get_correction_weight(){
+    return correction_weight;
+}
 
 void Decoder::compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errors) {
     for (int v1 = 0; v1 < n; v1++) {
@@ -138,10 +154,34 @@ void Decoder::compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<
 
     for (int c1 = 0; c1 < m; c1++ ) {
 	    for (int v2 = 0; v2 < n; v2++) {
-	        synd_weight += (*synd_matrix_ptr)(v2,c1);
+	        synd_weight += (*synd_matrix_ptr)(v2,c1)*(*synd_mask_ptr)(v2,c1);
+	    }
+    }
+}
+
+int Decoder::compute_syndrome_weight(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& synd_mask) const {
+    mat<bool> tmp_synd_matrix_ptr = mat<bool>(n,m,false);
+    int synd_weight = 0;
+
+    for (int v1 = 0; v1 < n; v1++) {
+        for (int c2 = 0; c2 < m; c2++) {
+            // (*synd_matrix_ptr)(v1,c2) = false;
+            for (int i = 0; i < dv; i++) {
+		        (tmp_synd_matrix_ptr)(v1,c2) ^= cc_errors((*bit_nbhd_ptr)(v1,i),c2);
+            }
+            for (int j = 0; j < dc; j++) {
+                (tmp_synd_matrix_ptr)(v1,c2) ^= vv_errors(v1,(*check_nbhd_ptr)(c2,j));
+            }
+        }
+    }
+
+    for (int c1 = 0; c1 < m; c1++ ) {
+	    for (int v2 = 0; v2 < n; v2++) {
+	        synd_weight += (tmp_synd_matrix_ptr)(v2,c1)*(synd_mask)(v2,c1);
 	    }
     }
 
+    return synd_weight;
 }
 
 void Decoder::find_best_gen() {
@@ -152,7 +192,7 @@ void Decoder::find_best_gen() {
         for (int v2 = 0; v2 < n; v2++) {
             synd_diff = (*lookup_table_ptr)(c1,v2)->get_best_synd_diff();
             weight = (*lookup_table_ptr)(c1,v2)->get_best_weight();
-            if (synd_diff > 0 && best_synd_diff*weight < synd_diff*best_weight) {
+            if (best_synd_diff*weight < synd_diff*best_weight) {
                 best_gen[0] = c1;
                 best_gen[1] = v2;
                 best_synd_diff = synd_diff;
@@ -182,20 +222,18 @@ void Decoder::find_best_gen(int k) {
                 int best_weight = best_gens[i]->get_best_weight();
                 if (synd_diff > 0 && best_synd_diff*weight < synd_diff*best_weight) {
                     best_gen_indices.insert(best_gen_indices.begin()+i, make_tuple(c1, v2));
-                    // best_gen_indices.insert(best_gen_indices.begin()+i, c1);
                     best_gens.insert(best_gens.begin()+i, (*lookup_table_ptr)(c1, v2));
                     placed = true;
                     break;
                 }
             }
 
-            if (best_gens.size() > k) {
+            if (int(best_gens.size()) > k) {
                 best_gens.pop_back();
                 best_gen_indices.resize(best_gen_indices.size()-1);
             }
-            if (synd_diff > 0 && !placed && best_gens.size() < k) {
+            if (synd_diff > 0 && !placed && int(best_gens.size()) < k) {
                 best_gen_indices.push_back(make_tuple(c1, v2));
-                // best_gen_indices.push_back(v2);
                 best_gens.push_back((*lookup_table_ptr)(c1,v2));
             }  
         }
@@ -243,18 +281,29 @@ void Decoder::update_synd_matrix(int c1, int v2) {
 
 void Decoder::update_qbits_flips(int c1, int v2) {
     for (int i = 0; i < dc; i++) {
-        (*vv_qbits_ptr)((*check_nbhd_ptr)(c1,i),v2) ^= (*lookup_table_ptr)(c1,v2)->get_best_rows_flips(i);
+        bool flip = (*lookup_table_ptr)(c1,v2)->get_best_rows_flips(i);
+        if ((*vv_qbits_ptr)((*check_nbhd_ptr)(c1,i),v2))
+            correction_weight -= flip;
+        else
+            correction_weight += flip;
+        (*vv_qbits_ptr)((*check_nbhd_ptr)(c1,i),v2) ^= flip;
     }
     for (int j = 0; j < dv; j++) {
-        (*cc_qbits_ptr)(c1,(*bit_nbhd_ptr)(v2,j)) ^= (*lookup_table_ptr)(c1,v2)->get_best_col_flips(j);
+        bool flip = (*lookup_table_ptr)(c1,v2)->get_best_col_flips(j);
+        if ((*cc_qbits_ptr)(c1,(*bit_nbhd_ptr)(v2,j)))
+            correction_weight -= flip;
+        else
+            correction_weight += flip;
+        (*cc_qbits_ptr)(c1,(*bit_nbhd_ptr)(v2,j)) ^= flip;
     }
 }
 
 void Decoder::update_score_generator(int c1, int v2) {
-    (*lookup_table_ptr)(c1,v2)->score_gen(gray_code, *bit_nbhd_ptr, *check_nbhd_ptr , *synd_matrix_ptr);
+    (*lookup_table_ptr)(c1,v2)->score_gen(gray_code, *bit_nbhd_ptr, *check_nbhd_ptr , *synd_matrix_ptr, *synd_mask_ptr);
 }
 
-void Decoder::decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors) {
+void Decoder::decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& mask) {
+    synd_mask_ptr = new mat<bool>(mask);
     compute_syndrome_matrix_ptr(vv_errors, cc_errors);
 
     for (int c1 = 0; c1 < m; c1++) {
@@ -276,9 +325,9 @@ void Decoder::decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors) {
     }
 }
 
-void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, int k) {
+void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& mask, int k) {
+    synd_mask_ptr = new mat<bool>(mask);
     compute_syndrome_matrix_ptr(vv_errors, cc_errors);
-    // cout << "beginning syndrome weight: " << synd_weight << endl;
     // can parallelize this too ig
     for (int c1 = 0; c1 < m; c1++) {
         for (int v2 = 0; v2 < n; v2++) {
@@ -286,102 +335,134 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
         }
     }
     
-    deque<Decoder> decoders;
-    deque<Decoder> finished_decoders;
+    vector<Decoder> decoders;
+    vector<Decoder> finished_decoders;
+    // cout << "max threads: " << omp_get_max_threads() << endl;
 
     Decoder root = Decoder(*this);
-    // root.find_best_gen(k);
-    // for (size_t i = 0; i < root.best_gen_indices.size(); i++) {
-    //     cout << root.best_gen_indices[i] << " ";
-    // }
-    // cout << endl;
-    // root.update(5, 0);
-    // root.find_best_gen(k);
-    // for (size_t i = 0; i < root.best_gen_indices.size(); i++) {
-    //     cout << root.best_gen_indices[i] << " ";
-    // }
-    // cout << endl;
-    // cout << float((*root.lookup_table_ptr)(5, 0)->get_best_synd_diff())/float((*root.lookup_table_ptr)(5, 0)->get_best_weight()) << endl;
-    // root.update(5, 0);
-    // cout << float((*root.lookup_table_ptr)(5, 0)->get_best_synd_diff())/float((*root.lookup_table_ptr)(5, 0)->get_best_weight()) << endl;
-
-    // tmp_gen.find_best_gen(1);
-    // for (size_t i = 0; i < tmp_gen.best_gen_indices.size(); i++) {
-    //     cout << tmp_gen.best_gen_indices[i] << " ";
-    // }
-    // cout << endl;
-    // find_best_gen(k);
-    // cout << "og: ";
-    // for (size_t i = 0; i < best_gen_indices.size(); i++) {
-    //     cout << best_gen_indices[i] << " ";
-    // }
-    // cout << endl;
-
     decoders.push_back(root);
 
     while (decoders.size()) {
-    // for (int m = 0; m < 2; m++) {
+        // double itime = omp_get_wtime();
+
         size_t dec_size = decoders.size();
-        // cout << "dec list size " << dec_size << endl;
+        // cout << dec_size << " ";
         // parallelize this
-        for (size_t i = 0; i < dec_size; i++) {
-            decoders[i].find_best_gen(k);
+        // #pragma omp parallel
+        {
+            // vector<Decoder> thread_tmp_dec;
+            // vector<Decoder> thread_tmp_finished_dec;
 
-            if (!decoders[i].best_gen_indices.size()) {
-                // cout << "done" << endl;
-                finished_decoders.push_back(Decoder(decoders[i]));
-                continue;
+            // # pragma omp for
+            for (size_t i = 0; i < dec_size; i++) {
+                decoders[i].find_best_gen(k);
+
+                if (!decoders[i].best_gen_indices.size()) {
+                    // thread_tmp_finished_dec.push_back(Decoder(decoders[i]));
+                    finished_decoders.push_back(Decoder(decoders[i]));
+                } else {
+                    for (size_t j = 0; j < decoders[i].best_gen_indices.size(); j++) {
+                        Decoder tmp_dec = Decoder(decoders[i]);
+
+                        int c1_ = get<0>(tmp_dec.best_gen_indices[j]);
+                        int v2_ = get<1>(tmp_dec.best_gen_indices[j]);
+
+                        tmp_dec.update(c1_, v2_);
+                        // thread_tmp_dec.push_back(tmp_dec);
+                        decoders.push_back(tmp_dec);
+
+                    }
+                }
             }
-            // cout << decoders[i].best_gen_indices.size() << endl;
-            for (size_t j = 0; j < decoders[i].best_gen_indices.size(); j++) {
-                Decoder tmp_dec = Decoder(decoders[i]);
-                // cout << "copy of copy: ";
-                // for (size_t i = 0; i < tmp_dec.best_gen_indices.size(); i++) {
-                //     cout << tmp_dec.best_gen_indices[i] << " ";
-                // }
 
-                // cout << "before access" << endl;
-                // int c1_ = tmp_dec.best_gen_indices[j];
-                int c1_ = get<0>(tmp_dec.best_gen_indices[j]);
-                // int v2_ = tmp_dec.best_gen_indices[j+1];
-                int v2_ = get<1>(tmp_dec.best_gen_indices[j]);
-
-                // cout << c1_ << " " << v2_ << endl;
-
-                // tmp_dec.vv_qbits_ptr->print_true();
-                // tmp_dec.cc_qbits_ptr->print_true();
-                // cout << "before update" << endl;
-                tmp_dec.update(c1_, v2_);
-                // tmp_dec.vv_qbits_ptr->print_true();
-                // tmp_dec.cc_qbits_ptr->print_true();
-                // tmp_dec.find_best_gen(k);
-                decoders.push_back(tmp_dec);
-                // cout << "no copy?" << endl;
-            }
+            // #pragma omp critical
+            // {
+            //     decoders.insert(decoders.end(), make_move_iterator(thread_tmp_dec.begin()), make_move_iterator(thread_tmp_dec.end()));
+            //     finished_decoders.insert(finished_decoders.end(), 
+            //         make_move_iterator(thread_tmp_finished_dec.begin()), make_move_iterator(thread_tmp_finished_dec.end()));
+            // }
         }
-        // cout << "erasing-----------------------" << endl;
-
-        for (size_t i = 0; i < dec_size; i++) { // remove old decoders
-            decoders.pop_front();
-        }
-        // check for duplicate syndromes here
-
-        decoders.erase(unique(decoders.begin(), decoders.end()), decoders.end());
+        
+        // cout << "before erasing: " << endl;
         // for (size_t i = 0; i < decoders.size(); i++) {
         //     decoders[i].vv_qbits_ptr->print_true();
-            // decoders[i].cc_qbits_ptr->print_true();
-            // decoders[i].synd_matrix_ptr->print_true();
-            // cout << decoders[i].synd_weight << endl;
+        //     decoders[i].cc_qbits_ptr->print_true();
+        //     cout << endl;
         // }
+        vector<Decoder>(decoders.begin()+dec_size, decoders.end()).swap(decoders);
 
-        // cout << endl;
+        // cout << "after erasing/before unique: " << endl;
+        // for (size_t i = 0; i < decoders.size(); i++) {
+        //     decoders[i].vv_qbits_ptr->print_true();
+        //     decoders[i].cc_qbits_ptr->print_true();
+        //     cout << endl;
+        // }
+        vector<Decoder> tmp_decs;
+        for (size_t i = 0; i < decoders.size(); i++) {
+            bool duplicate = false;
+            for (size_t j = 0; j < tmp_decs.size(); j++) {
+                if (tmp_decs[j] == decoders[i]) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate)
+                tmp_decs.push_back(decoders[i]);
+        }
+        decoders = vector<Decoder>(tmp_decs);
+        // double ftime = omp_get_wtime();
+        // cout << (ftime - itime) << endl;
+        // cout << duration.count() << endl;
+        // cout << "after unique: " << endl;
+        // for (size_t i = 0; i < decoders.size(); i++) {
+        //     decoders[i].vv_qbits_ptr->print_true();
+        //     decoders[i].cc_qbits_ptr->print_true();
+        //     cout << endl;
+        // }
+        // cout << "++++++++++++++++++" << endl;
     }
 
-    // for (int i = 0; i < finished_decoders.size(); i++) {
+    // ----------------------------------------------
+    // cout << "*********************" << endl;
+
+    // cout << "before finished unique: " << endl;
+    // for (size_t i = 0; i < finished_decoders.size(); i++) {
     //     finished_decoders[i].vv_qbits_ptr->print_true();
-    //     cout << finished_decoders[0].synd_weight << endl;
+    //     finished_decoders[i].cc_qbits_ptr->print_true();
+    //     cout << endl;
     // }
-    
-    // finished_decoders[0].vv_qbits_ptr->print_true();
+    vector<Decoder> tmp_finished_decs;
+    for (size_t i = 0; i < finished_decoders.size(); i++) {
+        bool duplicate = false;
+        for (size_t j = 0; j < tmp_finished_decs.size(); j++) {
+            if (tmp_finished_decs[j] == finished_decoders[i]) {
+                // cout << i << endl;
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) {
+            tmp_finished_decs.push_back(finished_decoders[i]);
+        }
+    }
+    finished_decoders = vector<Decoder>(tmp_finished_decs);
+
+    // cout << "after finished unique: " << endl;
+    // for (size_t i = 0; i < finished_decoders.size(); i++) {
+    //     finished_decoders[i].vv_qbits_ptr->print_true();
+    //     finished_decoders[i].cc_qbits_ptr->print_true();
+    //     cout << endl;
+    // }
+
+    Decoder d = *min_element(finished_decoders.begin(), finished_decoders.end());
+
+    // cout << "??????????????" << endl;
+    // d.vv_qbits_ptr->print_true();
+    // d.cc_qbits_ptr->print_true();
+    // cout << endl;
+
+    vv_qbits_ptr = new mat<bool>(*d.vv_qbits_ptr);
+    cc_qbits_ptr = new mat<bool>(*d.cc_qbits_ptr);
+    synd_weight = d.synd_weight;
 }
 

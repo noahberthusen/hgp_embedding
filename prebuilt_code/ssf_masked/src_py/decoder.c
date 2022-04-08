@@ -17124,7 +17124,7 @@ static PyObject *__pyx_pf_7decoder_24random_error(CYTHON_UNUSED PyObject *__pyx_
  *     Return a random iid error of proba 'p'
  *     """
  *     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]             # <<<<<<<<<<<<<<
- *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+ *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
  * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 666, __pyx_L1_error)
@@ -17257,7 +17257,7 @@ static PyObject *__pyx_pf_7decoder_24random_error(CYTHON_UNUSED PyObject *__pyx_
   /* "decoder.pyx":667
  *     """
  *     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]
- *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]             # <<<<<<<<<<<<<<
+ *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]             # <<<<<<<<<<<<<<
  * 
  *     return (vv_xerror, cc_xerror)
  */
@@ -17365,7 +17365,7 @@ static PyObject *__pyx_pf_7decoder_24random_error(CYTHON_UNUSED PyObject *__pyx_
       __pyx_t_9 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_tuple__3, NULL); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 667, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-      __pyx_t_6 = PyObject_RichCompare(__pyx_int_0, __pyx_t_9, Py_GT); __Pyx_XGOTREF(__pyx_t_6); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 667, __pyx_L1_error)
+      __pyx_t_6 = PyObject_RichCompare(__pyx_v_p, __pyx_t_9, Py_GT); __Pyx_XGOTREF(__pyx_t_6); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 667, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
       __pyx_t_10 = __Pyx_PyObject_IsTrue(__pyx_t_6); if (unlikely(__pyx_t_10 < 0)) __PYX_ERR(0, 667, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
@@ -17389,7 +17389,7 @@ static PyObject *__pyx_pf_7decoder_24random_error(CYTHON_UNUSED PyObject *__pyx_
   __pyx_t_1 = 0;
 
   /* "decoder.pyx":669
- *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+ *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
  * 
  *     return (vv_xerror, cc_xerror)             # <<<<<<<<<<<<<<
  * 
@@ -18613,7 +18613,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  *     Return a random iid error of proba 'p'
  *     """
  *     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]             # <<<<<<<<<<<<<<
- *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+ *     cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
  * 
  */
   __pyx_tuple__3 = PyTuple_Pack(2, __pyx_int_0, __pyx_int_1); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 666, __pyx_L1_error)

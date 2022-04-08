@@ -49,6 +49,7 @@ generator::generator(int C1, int V2, int DC, int DV) :
 
     // No need to initialise this matrix. It is used only in score_gen where it is initialized
     synd_gen_ptr = new mat<bool>(dc,dv,false);
+    synd_gen_mask_ptr = new mat<bool>(dc,dv,false);
 }
 
 
@@ -84,6 +85,7 @@ generator::generator(const generator& gen) :
     }
 
     synd_gen_ptr = new mat<bool>(dc,dv,false);
+    synd_gen_mask_ptr = new mat<bool>(dc,dv,true);
 }
 
 generator generator::operator=(const generator& gen){
@@ -92,6 +94,7 @@ generator generator::operator=(const generator& gen){
 
 generator::~generator() {
     delete synd_gen_ptr;
+    delete synd_gen_mask_ptr;
     delete [] rows_synd_diff;
     delete [] col_flips;
     delete [] rows_flips;
@@ -133,29 +136,31 @@ void generator::update_best() {
 void generator::score_gen(const int* gray_code,
 			  const mat<int>& bit_nbhd,
 			  const mat<int>& check_nbhd,
-			  const mat<bool>& synd_matrix) {
+			  const mat<bool>& synd_matrix,
+              const mat<bool>& synd_mask) {
     
     for (int i = 0; i < dc; i++) {
         for (int j = 0; j < dv; j++) {
-            // cout << "begin here?" << endl;
-            bool check = synd_matrix(check_nbhd(c1,i),bit_nbhd(v2,j));
-            // cout << "here?" << endl;
-            (*synd_gen_ptr)(i,j) = check;
+            (*synd_gen_ptr)(i,j) = synd_matrix(check_nbhd(c1,i),bit_nbhd(v2,j));
+            (*synd_gen_mask_ptr)(i,j) = synd_mask(check_nbhd(c1,i),bit_nbhd(v2,j));
         }
     }
-    // cout << "in score gen" << endl;
 
     col_weight = 0;
     for (int i = 0; i < dv; i++) {
         col_flips[i] = 0;
     }
     
+    // cout << "before first" << endl;
+
     for (int i = 0; i < dc; i++) {
         rows_synd_diff[i] = 0;
         for (int j = 0; j < dv; j++) { // put mask here
-	        rows_synd_diff[i] = rows_synd_diff[i] + 2*(*synd_gen_ptr)(i,j) - 1;
+            if ((*synd_gen_mask_ptr)(i,j))
+	            rows_synd_diff[i] = rows_synd_diff[i] + 2*(*synd_gen_ptr)(i,j) - 1;
         }
     }
+    // cout << "after first" << endl;
 
     col_synd_diff = 0;
     
@@ -174,14 +179,20 @@ void generator::score_gen(const int* gray_code,
 	int ind = (rand() % static_cast<int>(size_gray));
 	int j = gray_code[ind];
 #endif
+    // cout << "before second" << endl;
 
 	int a = (1-2*col_flips[j]);
 	col_weight = col_weight + a;
 	col_flips[j] = col_flips[j] + a;
 	for (int i = 0; i < dc; i++) { // put mask here
-	    rows_synd_diff[i] = rows_synd_diff[i] - a*4*(*synd_gen_ptr)(i,j) + a*2;
-	    col_synd_diff = col_synd_diff + a*2*(*synd_gen_ptr)(i,j) - a;
+        if ((*synd_gen_mask_ptr)(i,j)) {
+	        rows_synd_diff[i] = rows_synd_diff[i] - a*4*(*synd_gen_ptr)(i,j) + a*2;
+	        col_synd_diff = col_synd_diff + a*2*(*synd_gen_ptr)(i,j) - a;
+        }
 	}
+
+    // cout << "after second" << endl;
+
 
 	col_subset_score();
 	int weight = compute_weight(wt_rows_flips, col_weight);
@@ -192,8 +203,6 @@ void generator::score_gen(const int* gray_code,
 #endif
 	}
     }
-
-    // cout << "end score gen" << endl;
 }
 
 // Computes the best rows to flip for the current flip of collumns

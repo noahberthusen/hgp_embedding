@@ -8,6 +8,12 @@
         "tuple": "cpp",
         "chrono": "cpp",
         "iterator": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "xtree": "cpp",
+        "set": "cpp",
+        "xiosbase": "cpp",
+        "random": "cpp",
+        "list": "cpp",
+        "xstring": "cpp"
     }
 }

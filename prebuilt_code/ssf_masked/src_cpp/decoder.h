@@ -88,12 +88,17 @@ class Decoder {
     Decoder operator=(const Decoder& dec); // Not implemented (rule of three)
     bool operator==(const Decoder& dec);
     ~Decoder();
-    
-    void decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors);
-    void decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, int k);
+
+    void decode(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& synd_mask);
+    void decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& synd_mask, int k);
     int get_synd_weight();
+    int get_correction_weight();
     const mat<bool>& get_vv_correction();
     const mat<bool>& get_cc_correction();
+
+    bool operator< (const Decoder& dec);
+    friend bool operator==(const Decoder& lhs, const Decoder& rhs);
+    int compute_syndrome_weight(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& synd_mask) const;
 
  private:
     
@@ -107,6 +112,7 @@ class Decoder {
     mat<int> const * bit_nbhd_ptr; // n x dv matrix, same than class qcode
 
     int synd_weight;  // Total weight of syndrome
+    int correction_weight; // weight of the guessed error
     mat<generator*>* lookup_table_ptr; // mxn matrix representing Z-type generators
     int round;
     mat<int>* last_update_ptr; // (*last_update_ptr)(c1,v2) is the last round we have updated (*lookup_table_ptr)(c1,v2)
@@ -117,8 +123,10 @@ class Decoder {
 
     mat<bool>* vv_qbits_ptr; // n x n matrix representing vv guessed error
     mat<bool>* cc_qbits_ptr; // m x m matrix representing cc guessed error
+
+    mat<bool>* synd_mask_ptr; // mask over the syndrome
     
-    void compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errorsm);
+    void compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errors);
     void find_best_gen(); // computes the best generator to flip for the current syndrome
     void find_best_gen(int k); // computes the best k generators to flip for the current syndrome
     void update(int c1, int v2); // Calls the three following update functions in the right order when flipping generator (c1,v2)

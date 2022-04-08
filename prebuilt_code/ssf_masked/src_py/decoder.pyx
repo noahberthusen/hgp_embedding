@@ -664,7 +664,7 @@ def random_error(ccode, p):
     Return a random iid error of proba 'p'
     """
     vv_xerror = [(v1,v2) for v1 in range(ccode.n) for v2 in range(ccode.n) if p > random.uniform(0,1)]
-    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if 0 > random.uniform(0,1)]
+    cc_xerror = [(c1,c2) for c1 in range(ccode.m) for c2 in range(ccode.m) if p > random.uniform(0,1)]
 
     return (vv_xerror, cc_xerror)
 

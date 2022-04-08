@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -g -Wall -Wextra -O3
+CXXFLAGS = -std=c++11 -fopenmp -Wall -Wextra -O3
 
 main: main.o decoder.o generator.o mat.o qcode.o write_result.o generate_id.o input_params.h flip.o
 	$(CXX) $(CXXFLAGS) -o main main.o decoder.o generator.o mat.o qcode.o write_result.o generate_id.o flip.o

@@ -35,16 +35,46 @@ mat<bool> generate_errors(double (p), int t) {
             }
         }
     }
-    // (0,15) (6,1) (6,13)
-    // errors(0,15) = 1;
-    // errors(6,1) = 1;
-    // errors(6,13) = 1;
+    return errors;
+}
+
+mat<bool> generate_mask(double (p), int n, int m) {
+    int r1;
+
+    mat<bool> mask(n,m,true);
+
+    random_device rd;  //Will be used to obtain a seed for the random number engine
+    mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+    bernoulli_distribution dis(p);
+    for (int a = 0; a < n; a++) {
+        for (int b = 0; b < m; b++) {
+            r1 = dis(gen);
+            if (r1 == 1) {
+                mask(a,b) = 0;
+            }
+        }
+    }
+    return mask;
+}
+
+mat<bool> vv(int t) {
+    // Matrix indices:       
+    // (6,9) (12,11) (12,12) 
+    mat<bool> errors(t,t,0);
+
+    errors(6,9) = 1;
+    errors(12,11) = 1;
+    errors(12,12) = 1;
 
     return errors;
 }
 
 mat<bool> cc(int t) {
+    // Matrix indices:       
+    // (0,4)
     mat<bool> errors(t,t,0);
+    errors(0,4) = 1;
+
     return errors;
 }
 
@@ -103,8 +133,8 @@ int main(int argc, char * argv[]) {
     // Probabilities we want to run
     // vector<double> p {0.01};
     vector<double> proba_vector;
-    for (int k = 1; k < 2; ++k) {
-	    proba_vector.push_back(k*0.04);
+    for (int k = 1; k < 6; ++k) {
+	    proba_vector.push_back(k*0.005);
     }
     
     int no_test = 1000;
@@ -122,7 +152,7 @@ int main(int argc, char * argv[]) {
     ////////// Parser //////////
     int c;
     double delay_saving = 0;
-    int rand_seed = 0;
+    int rand_seed = 2;
     
     while((c = getopt(argc, argv, "o:t:n:"))!= -1){
         switch(c) {
@@ -191,13 +221,13 @@ int main(int argc, char * argv[]) {
             double p = proba_vector[proba_ind];
             for (int code_ind = 0; code_ind < no_codes; code_ind++) {
                 qcode* Q_ptr = Q_ens.get_qcode_ptr(code_ind);
+                mat<bool> synd_mask = generate_mask(0.1, Q_ptr->n, Q_ptr->m);
                         
                 mat<bool> vv_errors = generate_errors(p, Q_ptr->n);
-                // mat<bool> vv_errors = cc(Q_ptr->n);
+                // mat<bool> vv_errors = vv(Q_ptr->n);
 
-                // mat<bool> cc_errors = generate_errors(p, Q_ptr->m);
-                mat<bool> cc_errors = cc(Q_ptr->m);
-
+                mat<bool> cc_errors = generate_errors(p, Q_ptr->m);
+                // mat<bool> cc_errors = cc(Q_ptr->m);
         // #if flip_flag
         //         flip flp(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
         //         flp.compute_syndrome_matrix_ptr(vv_errors, cc_errors);
@@ -207,36 +237,59 @@ int main(int argc, char * argv[]) {
         //         cc_errors = *flp.cc_qbits_ptr ^ cc_errors;
         // #endif
 
-                Decoder dec_list(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
-                Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+                for (int k_ind = 0; k_ind < 5; k_ind++) {
+                    Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+                    // Decoder dec2(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
 
+                    if (!k_ind)
+                        dec.decode(vv_errors, cc_errors, synd_mask);
+                    else
+                        dec.decode_list(vv_errors, cc_errors, synd_mask, k_ind);
+                    // dec.decode_list(vv_errors, cc_errors, 2);
+                    // dec.decode_list(vv_errors, cc_errors, 3);
+                    // dec2.decode_list(vv_errors, cc_errors, 3);
 
-                dec_list.decode_list(vv_errors, cc_errors, 1);
+                    // dec.decode(vv_errors, cc_errors);
 
-                // dec.decode(vv_errors, cc_errors);
-                // dec.get_vv_correction().print_true();
-                // vv_errors.print_true();
+                    // dec_list.get_vv_correction().print_true();
+                    // dec_list.get_cc_correction().print_true();
+                    // // dec.get_vv_correction().print_true();
+                    // cout << endl;
 
-                // vv_errors.print_true();
-                // cc_errors.print_true();
+                    mat<bool> final_vv_errors = dec.get_vv_correction() ^ vv_errors;
+                    mat<bool> final_cc_errors = dec.get_cc_correction() ^ cc_errors;
+                    // int synd_weight = dec.compute_syndrome_weight(final_vv_errors, final_cc_errors, generate_mask(0, Q_ptr->n, Q_ptr->m));
 
-                // mat<bool> final_vv_errors = dec.get_vv_correction() ^ vv_errors;
-                // mat<bool> final_cc_errors = dec.get_cc_correction() ^ cc_errors;
+                    if (dec.get_synd_weight() != 0) {
+                        res_ens.add_result(k_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, 0, 1);
+                    }
+                    else {
+                        int success = Q_ptr->is_stabilizer(final_vv_errors,final_cc_errors);
+                        res_ens.add_result(k_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, success, 0);
+                    }
 
-                // if (dec.get_synd_weight() != 0) {
-                //     res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, 0, 1);
-                // }
-                // else {
-                //     int success = Q_ptr->is_stabilizer(final_vv_errors,final_cc_errors);
-                //     res_ens.add_result(algo, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, success, 0);
-                // }
-                // res_ens.to_file(res_file_name);
+                    // mat<bool> final_vv_errors2 = dec2.get_vv_correction() ^ vv_errors;
+                    // mat<bool> final_cc_errors2 = dec2.get_cc_correction() ^ cc_errors;
 
+                    // if (dec2.get_synd_weight() != 0) {
+                    //     res_ens.add_result(3, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, 0, 1);
+                    // }
+                    // else {
+                    //     int success2 = Q_ptr->is_stabilizer(final_vv_errors2,final_cc_errors2);
+                    //     res_ens.add_result(3, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, 1, success2, 0);
+                    // }
+                    res_ens.to_file(res_file_name);
 
-                // if (difftime(time(NULL),last_saving) > delay_saving) {
-                //     time(&last_saving);
-                //     res_ens.to_file(res_file_name);
-                // }
+                    // if (dec.get_synd_weight() != dec2.get_synd_weight()) {
+                    //     cout << dec.get_synd_weight() << " " << dec2.get_synd_weight() << endl;
+                    // vv_errors.print_true();
+                    // cc_errors.print_true();
+                    // }
+                    // if (difftime(time(NULL),last_saving) > delay_saving) {
+                    //     time(&last_saving);
+                    //     res_ens.to_file(res_file_name);
+                    // }
+                }
             }
         }
     }

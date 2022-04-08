@@ -55,7 +55,7 @@ class generator {
 
     // Compute the best possible flip for this generator
     void score_gen(const int* gray_code, const mat<int>& bit_nbhd,
-		   const mat<int>& check_nbhd, const mat<bool>& synd_matrix);
+		   const mat<int>& check_nbhd, const mat<bool>& synd_matrix, const mat<bool>& synd_mask);
 
     // Getters
     bool get_best_rows_flips(int i);
@@ -88,6 +88,7 @@ class generator {
     int wt_rows_flips;
 
     mat<bool>* synd_gen_ptr;
+    mat<bool>* synd_gen_mask_ptr;
     //////////////////////////////////////////////////
 
     void col_subset_score(); // Compute the best rows to flip with current collumn flip
