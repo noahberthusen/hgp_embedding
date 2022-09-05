@@ -4,6 +4,7 @@
 
 #include "input_params.h"
 #include "generator.h"
+#include "qcode.h"
 #include <math.h>
 #include <vector>
 #include <tuple>
@@ -93,6 +94,7 @@ class Decoder {
     void decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors, const mat<bool>& synd_mask, int k);
     int get_synd_weight();
     int get_correction_weight();
+    bool get_contains_error();
     const mat<bool>& get_vv_correction();
     const mat<bool>& get_cc_correction();
 
@@ -113,6 +115,7 @@ class Decoder {
 
     int synd_weight;  // Total weight of syndrome
     int correction_weight; // weight of the guessed error
+    bool contains_error; // whether or not the final list contains the error (or maybe stabilizer)
     mat<generator*>* lookup_table_ptr; // mxn matrix representing Z-type generators
     int round;
     mat<int>* last_update_ptr; // (*last_update_ptr)(c1,v2) is the last round we have updated (*lookup_table_ptr)(c1,v2)

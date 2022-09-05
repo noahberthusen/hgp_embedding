@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>D3 World Map</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <style>
+        div#halfpage{
+        height: 900px;
+        width: 800px;
+        border:2px solid #000;
+        overflow-y: auto;
+        }
+        svg#sky {
+          height: 1000px;
+          width: 1100px;
+          border:1px dotted #ccc;
+          background-color: #ccc;
+       }
+    </style>
+  </head>
+  <body>
+  <script type="text/javascript">
+
+  var elements = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+
+  var container = d3.select("body").append("div")
+    .attr("id", "halfpage");
+
+    var svgContainer = container.append('svg')
+        //.attr('height', 100)
+        //.attr('width', 100)
+        .attr('id', 'sky');
+
+    svgContainer.selectAll("rects1")
+                .data(elements)
+                .enter()
+                .append("rect")
+                .attr("width", 50)
+                .attr("height", 20)
+                .attr("x", 475)
+                .attr("y", function(d, i){
+                    return 100 * i;
+                })
+                .style("fill", "brown");
+
+    </script>
+  </body>

@@ -139,6 +139,10 @@ int Decoder::get_correction_weight(){
     return correction_weight;
 }
 
+bool Decoder::get_contains_error() {
+    return contains_error;
+}
+
 void Decoder::compute_syndrome_matrix_ptr(const mat<bool>& vv_errors, const mat<bool>& cc_errors) {
     for (int v1 = 0; v1 < n; v1++) {
         for (int c2 = 0; c2 < m; c2++) {
@@ -192,6 +196,9 @@ void Decoder::find_best_gen() {
         for (int v2 = 0; v2 < n; v2++) {
             synd_diff = (*lookup_table_ptr)(c1,v2)->get_best_synd_diff();
             weight = (*lookup_table_ptr)(c1,v2)->get_best_weight();
+            if (synd_diff/weight > 6) {
+                cout << synd_diff/weight << endl;
+            }
             if (best_synd_diff*weight < synd_diff*best_weight) {
                 best_gen[0] = c1;
                 best_gen[1] = v2;
@@ -334,7 +341,7 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
 	        update_score_generator(c1, v2);
         }
     }
-    
+    const int MAX_SIZE = 20000;
     vector<Decoder> decoders;
     vector<Decoder> finished_decoders;
     // cout << "max threads: " << omp_get_max_threads() << endl;
@@ -369,7 +376,8 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
 
                         tmp_dec.update(c1_, v2_);
                         // thread_tmp_dec.push_back(tmp_dec);
-                        decoders.push_back(tmp_dec);
+                        if (decoders.size() < MAX_SIZE)
+                            decoders.push_back(tmp_dec);
 
                     }
                 }
@@ -383,7 +391,7 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
             // }
         }
         
-        // cout << "before erasing: " << endl;
+        // cout << " before erasing: " << decoders.size() << endl;
         // for (size_t i = 0; i < decoders.size(); i++) {
         //     decoders[i].vv_qbits_ptr->print_true();
         //     decoders[i].cc_qbits_ptr->print_true();
@@ -424,6 +432,9 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
 
     // ----------------------------------------------
     // cout << "*********************" << endl;
+    // cout << "*********************" << endl;
+    // cout << "*********************" << endl;
+
 
     // cout << "before finished unique: " << endl;
     // for (size_t i = 0; i < finished_decoders.size(); i++) {
@@ -446,13 +457,6 @@ void Decoder::decode_list(const mat<bool>& vv_errors, const mat<bool>& cc_errors
         }
     }
     finished_decoders = vector<Decoder>(tmp_finished_decs);
-
-    // cout << "after finished unique: " << endl;
-    // for (size_t i = 0; i < finished_decoders.size(); i++) {
-    //     finished_decoders[i].vv_qbits_ptr->print_true();
-    //     finished_decoders[i].cc_qbits_ptr->print_true();
-    //     cout << endl;
-    // }
 
     Decoder d = *min_element(finished_decoders.begin(), finished_decoders.end());
 

@@ -336,7 +336,7 @@ def decoder(ccode, synd_matrix, mask):
     cc_guessed_xerror = [[False for c2 in range(ccode.m)] for c1 in range(ccode.m)]
     lookup_table = Lookup_table(ccode,synd_matrix, mask, ccode.dv, ccode.dc)
 
-    #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+    # print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
     gen = lookup_table.find_best_gen()
     while gen != None:
         (vv_qbits,cc_qbits) = lookup_table.update(gen)
@@ -344,9 +344,9 @@ def decoder(ccode, synd_matrix, mask):
             vv_guessed_xerror[v1][v2] = not vv_guessed_xerror[v1][v2]
         for (c1,c2) in cc_qbits:
             cc_guessed_xerror[c1][c2] = not cc_guessed_xerror[c1][c2]
-        #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+        # print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
         gen = lookup_table.find_best_gen()
-    #print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
+    # print("synd weight:", lookup_table.synd_weight, " masked synd weight:", lookup_table.masked_synd_weight)
 
     return (lookup_table.synd_weight,xerror_to_list(ccode, (vv_guessed_xerror, cc_guessed_xerror)))
 
@@ -668,6 +668,17 @@ def random_error(ccode, p):
 
     return (vv_xerror, cc_xerror)
 
+def random_sized_error(ccode, s):
+    """
+    Return a random iid error of proba 'p'
+    """
+    arr = [i for i in range(ccode.n**2 + ccode.m**2)]
+    errors = random.sample(arr, s)
+    vv_xerror = [divmod(e, ccode.n) for e in errors if e < ccode.n**2]
+    cc_xerror = [divmod(e - ccode.n**2, ccode.m) for e in errors if e > ccode.n**2]
+
+    return (vv_xerror, cc_xerror)
+
 def random_mask(ccode, maskp):
     """
     Return a random mask for the code
@@ -678,11 +689,9 @@ def random_mask(ccode, maskp):
 
 # Output: 1 if corrected, 2 if non zero syndrome and 0 if logical error
 def run_algo_qcode(ccode, xerror, mask, logical2):
-    # xerror = random_error(ccode, p)
-    # mask = random_mask(ccode, maskp)
     synd_matrix = compute_synd_matrix(ccode, xerror)
     (synd_weight,guessed_xerror) = decoder(ccode, synd_matrix, mask)
-    # print(guessed_xerror)
+
     if synd_weight != 0:
         return 2
     else:

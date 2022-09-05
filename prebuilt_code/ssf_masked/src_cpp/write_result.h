@@ -6,7 +6,7 @@ class Result
 {
  public:
   
-  Result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,int no_test,int no_success,int no_stop);
+  Result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,double p_mask,int no_test,int no_success,int no_stop);
   Result(std::string line);
   std::string to_line();
   bool test_combine_res(Result r);
@@ -17,7 +17,7 @@ class Result
   
   int algo, dv, dc, n, m;
   std::string code_id;
-  double p_phys;
+  double p_phys, p_mask;
   int no_test, no_success, no_stop;
   
 };
@@ -27,7 +27,7 @@ class Result_ensemble
  public:
 
     void add_result(Result r);
-    void add_result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,int no_test,int no_success,int no_stop);
+    void add_result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,double p_mask,int no_test,int no_success,int no_stop);
     // Hypothesis: the file exists
     void add_file(const std::string file_name);
     // Deletes file_name

@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define COLUMN_NAMES_FOR_SIMULATION_DESCRITPION "algo,dv,dc,nv,nc,code_id,p_phys"
+#define COLUMN_NAMES_FOR_SIMULATION_DESCRITPION "algo,dv,dc,nv,nc,code_id,p_phys,p_mask"
 #define COLUMN_NAMES_FOR_SIMULATION_RESULTS "no_test,no_success,no_stop"
 #define COLUMN_NAMES_FOR_EXTRAS "p_log"
 // DO NOT modify SEPARATOR
@@ -17,7 +17,8 @@ using namespace std;
 #define FIRST_LINE COLUMN_NAMES_FOR_SIMULATION_DESCRITPION SEPARATOR COLUMN_NAMES_FOR_SIMULATION_RESULTS SEPARATOR COLUMN_NAMES_FOR_EXTRAS
 
 
-Result::Result(int algo,int dv,int dc,int n,int m,string code_id,double p_phys,int no_test,int no_success,int no_stop) : algo(algo),dv(dv),dc(dc),n(n),m(m),code_id(code_id),p_phys(p_phys),no_test(no_test),no_success(no_success),no_stop(no_stop)
+Result::Result(int algo,int dv,int dc,int n,int m,string code_id,double p_phys,double p_mask,int no_test,int no_success,int no_stop) : 
+algo(algo),dv(dv),dc(dc),n(n),m(m),code_id(code_id),p_phys(p_phys),p_mask(p_mask),no_test(no_test),no_success(no_success),no_stop(no_stop)
 {
 }
 
@@ -39,8 +40,10 @@ Result::Result(string line)
   m = stoi(tmp);
   getline(stream,tmp,',');
   code_id = tmp;
-  getline(stream,tmp,'\t');
+  getline(stream,tmp,',');
   p_phys = stod(tmp);
+  getline(stream,tmp,'\t');
+  p_mask = stod(tmp);
   getline(stream,tmp,'\t');
   getline(stream,tmp,',');
   no_test = stoi(tmp);
@@ -63,7 +66,7 @@ bool Result::test_combine_res(Result r) {
     return (algo == r.algo && dv == r.dv &&
 	  dc == r.dc && n == r.n &&
 	  m == r.m && code_id.compare(r.code_id) == 0 && 
-	    compare_proba(p_phys,r.p_phys));
+	    compare_proba(p_phys,r.p_phys) && compare_proba(p_mask,r.p_mask));
 }
 
 // Be carefull: use this function only if test_combine_res(r1, r2) is true
@@ -71,14 +74,14 @@ Result Result::combine_res(Result r) {
   int new_no_test = no_test + r.no_test;
   int new_no_success = no_success + r.no_success;
   int new_no_stop = no_stop + r.no_stop;
-  return Result(algo,dv,dc,n,m,code_id,p_phys,new_no_test,new_no_success,new_no_stop);
+  return Result(algo,dv,dc,n,m,code_id,p_phys,p_mask,new_no_test,new_no_success,new_no_stop);
 }
 
 
 string Result::to_line() {
   double p_log = double(no_success) / no_test;
   stringstream sstream;
-  sstream << algo << ',' << dv << ',' << dc << ',' << n << ',' << m << ',' << code_id << ',' << p_phys
+  sstream << algo << ',' << dv << ',' << dc << ',' << n << ',' << m << ',' << code_id << ',' << p_phys << ',' << p_mask
     << SEPARATOR << no_test << ',' << no_success << ',' << no_stop
     << SEPARATOR << p_log << "\n";
   return sstream.str();
@@ -95,8 +98,8 @@ void Result_ensemble::add_result(Result r){
 }
 
 
-void Result_ensemble::add_result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,int no_test,int no_success,int no_stop){
-    Result r(algo, dv, dc, n, m, code_id, p_phys, no_test, no_success, no_stop);
+void Result_ensemble::add_result(int algo,int dv,int dc,int n,int m,std::string code_id,double p_phys,double p_mask,int no_test,int no_success,int no_stop){
+    Result r(algo, dv, dc, n, m, code_id, p_phys, p_mask, no_test, no_success, no_stop);
     add_result(r);
 }
 

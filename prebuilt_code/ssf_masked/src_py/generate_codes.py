@@ -11,11 +11,11 @@ import uuid
 #Run this file to generate classical codes
 
 ###################################################   
-n = 360
-m = 300
+n = 84
+m = 70
 dv = 5
 dc = 6
-no_codes = 10
+no_codes = 1
 ##############
 # 'no_steps' is not used for configuration model
 no_steps = 10000

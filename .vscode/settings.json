@@ -1,19 +1,9 @@
 {
     "files.associations": {
-        "ostream": "cpp",
-        "vector": "cpp",
-        "iostream": "cpp",
-        "algorithm": "cpp",
-        "deque": "cpp",
-        "tuple": "cpp",
-        "chrono": "cpp",
-        "iterator": "cpp",
-        "xutility": "cpp",
-        "xtree": "cpp",
-        "set": "cpp",
-        "xiosbase": "cpp",
         "random": "cpp",
-        "list": "cpp",
-        "xstring": "cpp"
+        "vector": "cpp",
+        "tuple": "cpp",
+        "xlocale": "cpp",
+        "iostream": "cpp"
     }
 }

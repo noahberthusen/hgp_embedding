@@ -28,7 +28,7 @@ class qcode {
 	      const vector<int>& dc_vector,
 	      const vector<string>& id_vector) const;
 
-    bool is_stabilizer(const mat<bool>& vv_xerror, const mat<bool>& cc_xerror);
+    bool is_stabilizer(const mat<bool>& vv_xerror, const mat<bool>& cc_xerror) const;
 		
     void compute_cpci_rref();
     void compute_cpc_rref();

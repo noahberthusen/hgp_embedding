@@ -30,6 +30,7 @@ class mat{
 
     int get_no_rows() const;
     int get_no_cols() const;	
+    int count_nonzero() const;
 
  private:
     int no_rows, no_cols;
@@ -241,6 +242,19 @@ int mat<T>::get_no_rows() const{
 template<typename T>
 int mat<T>::get_no_cols() const{
     return no_cols;
+}
+
+template<typename T>
+int mat<T>::count_nonzero() const{
+    int sum = 0;
+    for (int i = 0; i < no_rows; i++) {
+        for (int j = 0; j < no_cols; j++) {
+            if ((*this)(i,j)) {
+                sum++;
+            }
+        }
+    }
+    return sum;
 }
 
 #endif

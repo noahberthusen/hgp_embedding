@@ -44,7 +44,7 @@ qcode::~qcode()
     delete ctpc_rref_ptr;
 }
 
-bool qcode::is_stabilizer(const mat<bool> &vv_xerror, const mat<bool> &cc_xerror)
+bool qcode::is_stabilizer(const mat<bool> &vv_xerror, const mat<bool> &cc_xerror) const
 {
     int lgu, pivot_lgu;
     lgu = pivot_lgu = -1;

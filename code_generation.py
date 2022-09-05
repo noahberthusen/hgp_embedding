@@ -27,7 +27,7 @@ while (vs.size and cs.size):
 
 # H = np.loadtxt('./ldpc_codes/16_4_3.txt', dtype=np.int8)
 
-f_name = f'./ccodes/{n}_{m}_{dv}_{dc}.txt'
+f_name = f'./ccodes/{n}_{m}_{dv}_{dc}.code'
 
 bit_nbhd = []
 for bit in range(n):
