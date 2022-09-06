@@ -2,6 +2,7 @@
 	<head>
 		<script src="https://d3js.org/d3.v4.js"></script>
 		<script src="decoder.js"></script>
+		<!-- <script src="read_code.js"></script> -->
 		<link rel="stylesheet" href="decoder.css"/>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
 		<!-- <style>
@@ -26,6 +27,9 @@
 					<button type="button" onclick="randomError()">Generate error</button>
 					<button type="button" onclick="randomMask()">Generate mask</button>
 					<button type="button" onclick="test()">test</button>
+					<button type="button" onclick="updateAll(lt1)">code1</button>
+					<button type="button" onclick="updateAll(lt2)">code2</button>
+
 				</div>
 				<div class="col-sm">
 					<div id="code" style="text-align: center"></div>
@@ -42,6 +46,8 @@
 </html>
 
 <script>
+
+
 
 function qcodeData(code) {
 	var n = 16
@@ -134,86 +140,58 @@ function qcodeData(code) {
 				yind: i,
 				vv_nbhd: check_nbhd[i],
 				cc_nbhd: bit_nbhd[j],
-				score: { best_flips: [], best_synd_diff: 0, best_wweight: 1 }
+				score: { best_flips: { ver_flips: [], hor_flips: [] }, best_synd_diff: 0, best_weight: 1 }
 			})
 		}
 	}
 	return {vv, cc, z_gens, x_gens}
 }
 
-var {vv, cc, z_gens, x_gens} = qcodeData()
-
-let width = 600
-let height = 600
+var width = 600
+var height = 600
 var n = 16
 var m = 12
-let dc = 4
-let dv = 3
-let padding = 1.5
+var dc = 4
+var dv = 3
+var padding = 1.5
 
-var code = d3.select("#code")
-		.append("svg")
-    .attr("width", width)
-    .attr("height", height)
-		// .call(d3.zoom().on("zoom", function () {
-    //    code.attr("transform", d3.event.transform)
-    // }))
-		.append("g")
+// var data = new Array()
+var data1 = qcodeData()
+var lt1 = new LookupTable(data1.vv, data1.cc, data1.z_gens, data1.x_gens, dv, dc)
+var data2 = qcodeData()
+var lt2 = new LookupTable(data2.vv, data2.cc, data2.z_gens, data2.x_gens, dv, dc)
+// data.push({ vv, cc, z_gens, x_gens })
+
 
 
 	// https://stackoverflow.com/questions/37429608/can-i-have-a-svg-pattern-with-background-color
 
 var myColor = d3.scaleLinear()
 	.range(["white", "#00A7FF"])
-  .domain([0, 1])
+  .domain([0, dc])
 
-let colors = {
+var colors = {
 	"DarkRed": "#F44336", // dark red
 	"LightRed": "#F88A81", // light red
 	"Gray": "#9E9E9E", // gray
 	"White": "#FFFFFF"
 }
 
-for (var color in colors) {
-	code.append('defs')
-	.append('pattern')
-	.attr('id', 'diagonal'+color)
-	.attr('patternUnits', 'userSpaceOnUse')
-	.attr('width', 4)
-	.attr('height', 4)
-	.append('rect')
-	.attr('width', 4)
-	.attr('height', 4)
-	.attr('x', 0)
-	.attr('x', 0)
-	.attr('fill', colors[color] );
-
-	d3.select('#diagonal'+color).append('path')
-		.attr('d', 'M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2')
-		.attr('stroke', 'black')
-		.attr('stroke-width', 0.75)
-		.attr("opacity", 1);
-}
-
 var randomError = function() {
-	var p = 0.01
-	vv.flat().map(function(qbt) {
-		qbt.in_error = (Math.random() < p)
-		d3.select(vv_column._groups[qbt.yind][qbt.xind]).style('fill', qubitFill(qbt, false))
-	})
-	cc.flat().map(function(qbt) {
-		qbt.in_error = (Math.random() < p)
-		d3.select(cc_column._groups[qbt.yind][qbt.xind]).style('fill', qubitFill(qbt, false))
-	})
-	syndrome()
+	lt1.randomError(0.01)
+	updateAll(lt1)
 }
 
 var randomMask = function () {
-	var p = 0.1
-	z_gens.flat().map(function(gen) {
-		gen.in_mask = (Math.random() < p)
-		d3.select(z_gen_column._groups[gen.yind][gen.xind]).style('fill', syndFill(gen, false))
-	})
+	lt1.randomMask(0.1)
+	updateAll(lt1)
+}
+
+var test = function() {
+	lt1.update_score_generators()
+	// console.log(lt1.find_best_gen())
+	renderCode(lt1)
+	renderRankings(lt1)
 }
 
 var syndFill = function(gen, highlight) { 
@@ -254,218 +232,130 @@ var qubitFill = function(qbt, highlight) {
 	}
 }
 
-let test = function() {
-	for (let k = 0; k < m; k++) {
-		for (let l = 0; l < n; l++) {
-			gen = x_gens[k][l]
+var selectedSmallSet = function (qbt, cx, cy, highlight) {
+	var repeat = function() {
+		var angle = 20
+		var angles = [0, angle, 0, -angle, 0]
+		var interpols = new Array()
 
-			let synd_gen = new Array()
-			let synd_mask = new Array()
-			for (let i = 0; i < dc; i++) {
-				synd_gen.push(new Array())
-				synd_mask.push(new Array())
-				for (let j = 0; j < dv; j++) {
-					synd_gen[i].push(z_gens[gen.vv_nbhd[i]][gen.cc_nbhd[j]].in_synd)
-					synd_mask[i].push(z_gens[gen.vv_nbhd[i]][gen.cc_nbhd[j]].in_mask)
-				}
-			}
-
-			gen.score = score_gen(synd_gen, synd_mask)
-			d3.select(x_gen_column._groups[k][l]).style('fill', function(d) { return myColor(d.score.best_synd_diff/d.score.best_wweight)} )
+		for (var i = 0; i < angles.length - 1; i++) {
+			interpols.push(d3.interpolateString( `rotate(${angles[i]},${cx},${cy})`, `rotate(${angles[i+1]},${cx},${cy})` ))
 		}
+
+		var dur = Math.random() * (200 - 150) + 150
+		d3.select(qbt).transition()
+			.duration(dur)
+			.attrTween("transform", function(d,i,a) { return interpols[0] })
+			.transition()
+			.duration(dur)
+			.attrTween("transform", function(d,i,a) { return interpols[1] })
+			.transition()
+			.duration(dur)
+			.attrTween("transform", function(d,i,a) { return interpols[2] })
+			.transition()
+			.duration(dur)
+			.attrTween("transform", function(d,i,a) { return interpols[3] })
+			.on("end", repeat)
 	}
 
-	renderRankings()
+	if (highlight) {
+		repeat()
+	} else {
+		var current_rot = d3.select(qbt).attr("transform")
+		var interpol = d3.interpolateString( current_rot, `rotate(0,${cx},${cy})` )
+
+		d3.select(qbt).transition()
+			.duration(200)
+			.attrTween("transform", function(d,i,a) { return interpol })
+	}
 }
 
-var vv_row = code.selectAll(".vv_row")
-	.data(vv)
-	.enter().append("g")
-	.attr("class", "vv_row");
-
-var cc_row = code.selectAll(".cc_row")
-	.data(cc)
-	.enter().append("g")
-	.attr("class", "cc_row")
-
-var z_gen_row = code.selectAll(".z_gen_row")
-	.data(z_gens)
-	.enter().append("g")
-	.attr("class", "z_gen_row")
-
-var x_gen_row = code.selectAll(".x_gen_row")
-	.data(x_gens)
-	.enter().append("g")
-	.attr("class", "x_gen_row")
+var updateAll = function(data) {
+	data.compute_syndrome()
+	data.update_score_generators()
+	renderAll(data)
+}
 
 
+var renderAll = function(data) {
 
-let renderRankings = function() {
-	d3.select('.right').selectAll("*").remove() // why
-	var ranking = d3.select(".right")
-		.append("div")
-		.attr("id", "halfpage")
+	d3.select('#code').selectAll("*").remove() // why
+
+	var code = d3.select("#code")
 		.append("svg")
-		.attr("id", "sky")
-		.attr("height", n*m*35)
+    .attr("width", width)
+    .attr("height", height)
+		// .call(d3.zoom().on("zoom", function () {
+    //    code.attr("transform", d3.event.transform)
+    // }))
+		.append("g")
 
-	var sorted_data = x_gens.flat()
-		.sort((a, b) => (a.score.best_synd_diff/a.score.best_wweight) - (b.score.best_synd_diff/b.score.best_wweight))
-		.reverse()
+		for (var color in colors) {
+			code.append('defs')
+			.append('pattern')
+			.attr('id', 'diagonal'+color)
+			.attr('patternUnits', 'userSpaceOnUse')
+			.attr('width', 4)
+			.attr('height', 4)
+			.append('rect')
+			.attr('width', 4)
+			.attr('height', 4)
+			.attr('x', 0)
+			.attr('x', 0)
+			.attr('fill', colors[color] );
 
-	var rankings = ranking.selectAll(".ranks")
-		.data(sorted_data)
+			d3.select('#diagonal'+color).append('path')
+				.attr('d', 'M-1,1 l2,-2 M0,4 l4,-4 M3,5 l2,-2')
+				.attr('stroke', 'black')
+				.attr('stroke-width', 0.75)
+				.attr("opacity", 1);
+		}
+
+	var vv_row = code
+		.append("g")
+		.selectAll(".vv_row")
+		.data(data.vv)
 		.enter()
 		.append("g")
-		// .on("mouseover", function (gen) {
-		// 	d3.select(x_gen_column._groups[gen.yind][gen.xind]).style('fill', 'red')
-		// })
-		// .on("mouseout", function(gen) {
-		// 	d3.select(x_gen_column._groups[gen.yind][gen.xind]).style('fill', 'white')
-
-		// })
-
-	rankings.append("rect")
-		.attr("width", 140) // fill container
-		.attr("height", 30) // just define
-		.attr("x", 3)
-		.attr("stroke", "black")
-		.attr("fill", "white")
-		// .attr("rx", 7)
-		.transition()
-		.duration(500)
-		.attr("y", function(d, i) {
-			return 35 * i // this can be determined by their ranking score
-		})
-
-	rankings.append("rect")
-		.attr("width", 10) 
-		.attr("height", 28) // just define
-		.attr("x", 4)
-		.style("fill", function(d) { return myColor(d.score.best_synd_diff/d.score.best_wweight)})
-		.transition()
-		.duration(500)
-		.attr("y", function(d, i) {
-			return 35 * i + 1 // this can be determined by their ranking score
-		})
+		.attr("class", "vv_row");
 	
-
-	// rankings.append("text")
-	// 	.text('\u0394(\u03C3, F)')
-	// 	.style("font-size", "20px")
-	// 	.attr("x", 0)
-	// 	.attr("y", function(d, i) {
-	// 		return 35 * i // this can be determined by their ranking score
-	// 	})
-	// 	// .style("fill", "black")
-
-}
-
-renderRankings()
-
-	
-	
-
-var x_gen_column = x_gen_row.selectAll(".x_gen")
-	.data(function(d) {return d})
-	.enter().append("rect")
-	.attr("class", "x_gen")
-	.attr("x", function(d) { return (d.xind) * width/(n+m+padding); })
-	.attr("y", function(d) { return (d.yind+n+padding) * height/(n+m+padding); })
-	.attr("width", width/(n+m+padding))
-	.attr("height", height/(n+m+padding))
-	.style("fill", function(d) { return myColor(d.score.best_synd_diff/d.score.best_wweight)})
-	.style("stroke", "#222")
-	.on('mouseover', function (gen) {
-			// d3.select(this).style("fill", syndFill(gen, true))
-			gen.vv_nbhd.map(function (qbt) {
-				vv_qbt = vv[qbt][gen.xind]
-				d3.select(vv_column._groups[qbt][gen.xind]).style('fill', qubitFill(vv_qbt, true))
-				vv_qbt.z_gen_nbhd.map(function (gen2) {
-					d3.select(z_gen_column._groups[vv_qbt.yind][gen2]).style('fill', syndFill(z_gens[vv_qbt.yind][gen2], true))
+	var vv_column = vv_row.selectAll(".vv_qubit")
+		.data(function(d) { return d; })
+		.enter().append("rect")
+		.attr("class", "vv_qubit")
+		.attr("x", function(d) { return (d.xind) * width/(n+m+padding); })
+		.attr("y", function(d) { return (d.yind) * height/(n+m+padding); })
+		.attr("width", width/(n+m+padding))
+		.attr("height", height/(n+m+padding))
+		.attr("cx", function(d) { return (d.xind) * width/(n+m+padding) + width/(n+m+padding)/2 })
+		.attr("cy", function(d) { return (d.yind) * height/(n+m+padding) + height/(n+m+padding)/2 })
+		.style("fill", function (qbt) { return qubitFill(qbt, false) })
+		.style("stroke", "#222")
+		.on('mouseover', function (qbt) {
+				d3.select(this).style('fill', qubitFill(qbt, true))
+				qbt.z_gen_nbhd.map(function (gen) {
+					d3.select(z_gen_column._groups[qbt.yind][gen]).style('fill', syndFill(data.z_gens[qbt.yind][gen], true))
 				})
 			})
-			gen.cc_nbhd.map(function (qbt) {
-				d3.select(cc_column._groups[gen.yind][qbt]).style('fill', qubitFill(cc[gen.yind][qbt], true))
-			})
-		})
-		.on('mouseout', function (gen) {
-			// d3.select(this).style("fill", syndFill(gen, false))
-			gen.vv_nbhd.map(function (qbt) {
-				vv_qbt = vv[qbt][gen.xind]
-				d3.select(vv_column._groups[qbt][gen.xind]).style('fill', qubitFill(vv_qbt, false))
-				vv_qbt.z_gen_nbhd.map(function (gen2) {
-					d3.select(z_gen_column._groups[vv_qbt.yind][gen2]).style('fill', syndFill(z_gens[vv_qbt.yind][gen2], false))
+			.on('mouseout', function (qbt) {
+				d3.select(this).style("fill", qubitFill(qbt, false))
+				qbt.z_gen_nbhd.map(function (gen) {
+					d3.select(z_gen_column._groups[qbt.yind][gen]).style('fill', syndFill(data.z_gens[qbt.yind][gen], false))
 				})
 			})
-			gen.cc_nbhd.map(function (qbt) {
-				d3.select(cc_column._groups[gen.yind][qbt]).style('fill', qubitFill(cc[gen.yind][qbt], false))
+			.on('click', function(qbt) {
+				qbt.in_error = !qbt.in_error
+				updateAll(data)
 			})
-		})
 
+// -------------------------------------------------------------
 
-var z_gen_column = z_gen_row.selectAll(".z_gen")
-	.data(function(d) {return d})
-	.enter().append("rect")
-	.attr("class", "z_gen")
-	.attr("x", function(d) { return (d.xind+n+padding) * width/(n+m+padding); })
-	.attr("y", function(d) { return (d.yind) * height/(n+m+padding); })
-	.attr("width", width/(n+m+padding))
-	.attr("height", height/(n+m+padding))
-	.style("fill", "#FFFFFF")
-	.style("stroke", "#222")
-	.on('mouseover', function (gen) {
-			d3.select(this).style("fill", syndFill(gen, true))
-			gen.vv_nbhd.map(function (qbt) {
-				d3.select(vv_column._groups[gen.yind][qbt]).style('fill', qubitFill(vv[gen.yind][qbt], true))
-			})
-			gen.cc_nbhd.map(function (qbt) {
-				d3.select(cc_column._groups[qbt][gen.xind]).style('fill', qubitFill(cc[qbt][gen.xind], true))
-			})
-		})
-		.on('mouseout', function (gen) {
-			d3.select(this).style("fill", syndFill(gen, false))
-			gen.vv_nbhd.map(function (qbt) {
-				d3.select(vv_column._groups[gen.yind][qbt]).style('fill', qubitFill(vv[gen.yind][qbt], false))
-			})
-			gen.cc_nbhd.map(function (qbt) {
-				d3.select(cc_column._groups[qbt][gen.xind]).style('fill', qubitFill(cc[qbt][gen.xind], false))
-			})
-		})
-		.on('click', function(gen) {
-			gen.in_mask = !gen.in_mask
-			d3.select(this).style("fill", syndFill(gen, true))
-		})
-
-	
-var vv_column = vv_row.selectAll(".vv_qubit")
-	.data(function(d) { return d; })
-	.enter().append("rect")
-	.attr("class", "vv_qubit")
-	.attr("x", function(d) { return (d.xind) * width/(n+m+padding); })
-	.attr("y", function(d) { return (d.yind) * height/(n+m+padding); })
-	.attr("width", width/(n+m+padding))
-	.attr("height", height/(n+m+padding))
-	.style("fill", "#FFFFFF")
-	.style("stroke", "#222")
-	.on('mouseover', function (qbt) {
-			d3.select(this).style('fill', qubitFill(qbt, true))
-			qbt.z_gen_nbhd.map(function (gen) {
-				d3.select(z_gen_column._groups[qbt.yind][gen]).style('fill', syndFill(z_gens[qbt.yind][gen], true))
-			})
-		})
-		.on('mouseout', function (qbt) {
-			d3.select(this).style("fill", qubitFill(qbt, false))
-			qbt.z_gen_nbhd.map(function (gen) {
-				d3.select(z_gen_column._groups[qbt.yind][gen]).style('fill', syndFill(z_gens[qbt.yind][gen], false))
-			})
-		})
-		.on('click', function(qbt) {
-			qbt.in_error = !qbt.in_error
-			d3.select(this).style("fill", qubitFill(qbt, true))				
-			syndrome()
-		})
-
+	var cc_row = code
+		.append("g")
+		.selectAll(".cc_row")
+		.data(data.cc)
+		.enter().append("g")
+		.attr("class", "cc_row")
 
 	var cc_column = cc_row.selectAll(".cc_qubit")
 		.data(function(d) { return d; })
@@ -475,51 +365,220 @@ var vv_column = vv_row.selectAll(".vv_qubit")
 		.attr("y", function(d) { return (d.yind+n+padding) * height/(n+m+padding); })
 		.attr("width", width/(n+m+padding))
 		.attr("height", height/(n+m+padding))
-		.style("fill", "#FFFFFF")
+		.attr("cx", function(d) { return (d.xind+n+padding) * width/(n+m+padding) + width/(n+m+padding)/2 })
+		.attr("cy", function(d) { return (d.yind+n+padding) * height/(n+m+padding) + height/(n+m+padding)/2 })
+		.style("fill", function (qbt) { return qubitFill(qbt, false) })
 		.style("stroke", "#222")
 		.on('mouseover', function (qbt) {
 			d3.select(this).style('fill', qubitFill(qbt, true))
 			qbt.z_gen_nbhd.map(function (gen) {
-				d3.select(z_gen_column._groups[gen][qbt.xind]).style('fill', syndFill(z_gens[gen][qbt.xind], true))
+				d3.select(z_gen_column._groups[gen][qbt.xind]).style('fill', syndFill(data.z_gens[gen][qbt.xind], true))
 			})
 		})
 		.on('mouseout', function (qbt) {
 			d3.select(this).style("fill", qubitFill(qbt, false))
 			qbt.z_gen_nbhd.map(function (gen) {
-				d3.select(z_gen_column._groups[gen][qbt.xind]).style('fill', syndFill(z_gens[gen][qbt.xind], false))
+				d3.select(z_gen_column._groups[gen][qbt.xind]).style('fill', syndFill(data.z_gens[gen][qbt.xind], false))
 			})
 		})
 		.on('click', function(qbt) {
 			qbt.in_error = !qbt.in_error
-			d3.select(this).style("fill", qubitFill(qbt, true))
-			syndrome()
+			updateAll(data)
 		})
 
-		
-		var syndrome = function() {
-			// clear syndrome
-			z_gens.flat().map(function(gen) { gen.in_synd = false })
+// -------------------------------------------------------------
 
-			cc.flat().map(function(qbt) {
-				if (qbt.in_error) {
-					qbt.z_gen_nbhd.map(function(yind) {
-						z_gens[yind][qbt.xind].in_synd = !z_gens[yind][qbt.xind].in_synd
-					})
-				}
-			})
-			vv.flat().map(function(qbt) {
-				if (qbt.in_error) {
-					qbt.z_gen_nbhd.map(function(xind) {
-						z_gens[qbt.yind][xind].in_synd = !z_gens[qbt.yind][xind].in_synd
-					})
-				}
-			})
-			d3.selectAll(".z_gen")
-				.each(function(gen) {
-					d3.select(this).style("fill", syndFill(gen, false))
+	var z_gen_row = code
+		.append("g")
+		.selectAll(".z_gen_row")
+		.data(data.z_gens)
+		.enter().append("g")
+		.attr("class", "z_gen_row")
+
+	var z_gen_column = z_gen_row.selectAll(".z_gen")
+		.data(function(d) {return d})
+		.enter().append("rect")
+		.attr("class", "z_gen")
+		.attr("x", function(d) { return (d.xind+n+padding) * width/(n+m+padding); })
+		.attr("y", function(d) { return (d.yind) * height/(n+m+padding); })
+		.attr("width", width/(n+m+padding))
+		.attr("height", height/(n+m+padding))
+		.style("fill", function(gen) { return syndFill(gen, false) })
+		.style("stroke", "#222")
+		.on('mouseover', function (gen) {
+				d3.select(this).style("fill", syndFill(gen, true))
+				gen.vv_nbhd.map(function (qbt) {
+					d3.select(vv_column._groups[gen.yind][qbt]).style('fill', qubitFill(data.vv[gen.yind][qbt], true))
 				})
-		}
+				gen.cc_nbhd.map(function (qbt) {
+					d3.select(cc_column._groups[qbt][gen.xind]).style('fill', qubitFill(data.cc[qbt][gen.xind], true))
+				})
+			})
+			.on('mouseout', function (gen) {
+				d3.select(this).style("fill", syndFill(gen, false))
+				gen.vv_nbhd.map(function (qbt) {
+					d3.select(vv_column._groups[gen.yind][qbt]).style('fill', qubitFill(data.vv[gen.yind][qbt], false))
+				})
+				gen.cc_nbhd.map(function (qbt) {
+					d3.select(cc_column._groups[qbt][gen.xind]).style('fill', qubitFill(data.cc[qbt][gen.xind], false))
+				})
+			})
+			.on('click', function(gen) {
+				gen.in_mask = !gen.in_mask
+				updateAll(data)
+			})
 
+// -------------------------------------------------------------
+
+	var x_gen_row = code
+		.append("g")
+		.selectAll(".x_gen_row")
+		.data(data.x_gens)
+		.enter().append("g")
+		.attr("class", "x_gen_row")
+
+	var x_gen_column = x_gen_row.selectAll(".x_gen")
+		.data(function(d) {return d})
+		.enter().append("rect")
+		.attr("class", "x_gen")
+		.attr("x", function(d) { return (d.xind) * width/(n+m+padding); })
+		.attr("y", function(d) { return (d.yind+n+padding) * height/(n+m+padding); })
+		.attr("width", width/(n+m+padding))
+		.attr("height", height/(n+m+padding))
+		.style("fill", function(d) { return myColor(d.score.best_synd_diff/d.score.best_weight)})
+		.style("stroke", "#222")
+		.on('mouseover', function(gen) { x_gen_mouseover(gen) })
+		.on('mouseout', function(gen) { x_gen_mouseout(gen) })
+		.on('click', function(gen) { x_gen_click(gen) })
+
+
+	var x_gen_mouseover = function(gen) {
+		// d3.select(this).style("fill", syndFill(gen, true))
+
+		gen.vv_nbhd.map(function (qbt, i) {
+			var vv_qbt = data.vv[qbt][gen.xind]
+			var vv_qbt_render = vv_column._groups[qbt][gen.xind]
+			cx = d3.select(vv_qbt_render).attr("cx")
+			cy = d3.select(vv_qbt_render).attr("cy")
+
+			d3.select(vv_qbt_render).style('fill', qubitFill(vv_qbt, true))
+
+			if (gen.score.best_flips.ver_flips.includes(i) && gen.score.best_synd_diff) {
+				d3.select(vv_qbt_render).raise()
+				d3.select(vv_qbt_render.parentNode).raise()
+				selectedSmallSet(vv_qbt_render, cx, cy, true)
+			}
+			vv_qbt.z_gen_nbhd.map(function (gen2) {
+				d3.select(z_gen_column._groups[vv_qbt.yind][gen2]).style('fill', syndFill(data.z_gens[vv_qbt.yind][gen2], true))
+			})
+		})
+		gen.cc_nbhd.map(function (qbt, i) {
+			var cc_qbt = data.cc[gen.yind][qbt]
+			var cc_qbt_render = cc_column._groups[gen.yind][qbt]
+			cx = d3.select(cc_qbt_render).attr("cx")
+			cy = d3.select(cc_qbt_render).attr("cy")
+
+			d3.select(cc_qbt_render).style('fill', qubitFill(cc_qbt, true))
+
+			if (gen.score.best_flips.hor_flips.includes(i) && gen.score.best_synd_diff) {
+				d3.select(cc_qbt_render).raise()
+				d3.select(cc_qbt_render.parentNode).raise()
+				selectedSmallSet(cc_qbt_render, cx, cy, true)
+			}
+		})
+	}
+
+	var x_gen_mouseout = function(gen) {
+	// d3.select(this).style("fill", syndFill(gen, false))
+		gen.vv_nbhd.map(function (qbt, i) {
+			var vv_qbt = data.vv[qbt][gen.xind]
+			var vv_qbt_render = vv_column._groups[qbt][gen.xind]
+			cx = d3.select(vv_qbt_render).attr("cx")
+			cy = d3.select(vv_qbt_render).attr("cy")
+
+			d3.select(vv_qbt_render).style('fill', qubitFill(vv_qbt, false))
+			if (gen.score.best_flips.ver_flips.includes(i) && gen.score.best_synd_diff) {
+				selectedSmallSet(vv_qbt_render, cx, cy, false)
+			}
+			vv_qbt.z_gen_nbhd.map(function (gen2) {
+				d3.select(z_gen_column._groups[vv_qbt.yind][gen2]).style('fill', syndFill(data.z_gens[vv_qbt.yind][gen2], false))
+			})
+		})
+		gen.cc_nbhd.map(function (qbt, i) {
+			var cc_qbt = data.cc[gen.yind][qbt]
+			var cc_qbt_render = cc_column._groups[gen.yind][qbt]
+			cx = d3.select(cc_qbt_render).attr("cx")
+			cy = d3.select(cc_qbt_render).attr("cy")
+
+			d3.select(cc_qbt_render).style('fill', qubitFill(cc_qbt, false))
+			if (gen.score.best_flips.hor_flips.includes(i) && gen.score.best_synd_diff) {
+				selectedSmallSet(cc_qbt_render, cx, cy, false)
+			}
+		})
+	}
+
+	var x_gen_click = function(gen) {
+		data.apply_gen(gen)
+		updateAll(data)
+	}
+
+// --------------------------------------------------------
+
+	d3.select('.right').selectAll("*").remove() // why
+	var ranking = d3.select(".right")
+		.append("div")
+		.attr("id", "halfpage")
+		.append("svg")
+		.attr("id", "sky")
+		.attr("height", 100*35)
+
+	var sorted_data = data.x_gens.flat()
+		.sort((a, b) => (a.score.best_synd_diff/a.score.best_weight) - (b.score.best_synd_diff/b.score.best_weight))
+		.reverse()
+
+	var rankings = ranking.selectAll(".ranks")
+		.data(sorted_data.slice(0,100))
+		.enter()
+		.append("g")
+		.on("mouseover", function(gen) { x_gen_mouseover(data.x_gens[gen.yind][gen.xind])	})
+		.on("mouseout", function(gen) { x_gen_mouseout(data.x_gens[gen.yind][gen.xind]) })
+		.on("click", function(gen) { x_gen_click(data.x_gens[gen.yind][gen.xind]) })
+
+	rankings.append("rect")
+		.attr("width", 140) // fill container
+		.attr("height", 30) // just define
+		.attr("x", 3)
+		.attr("stroke", "black")
+		.attr("fill", "white")
+		// .attr("rx", 7)
+		// .transition()
+		// .duration(500)
+		.attr("y", function(d, i) {
+			return 35 * i // this can be determined by their ranking score
+		})
+
+	rankings.append("rect")
+		.attr("width", 10) 
+		.attr("height", 28) // just define
+		.attr("x", 4)
+		.style("fill", function(d) { return myColor(d.score.best_synd_diff/d.score.best_weight)})
+		// .transition()
+		// .duration(500)
+		.attr("y", function(d, i) {
+			return 35 * i + 1 // this can be determined by their ranking score
+		})
+
+	rankings.append("text")
+		.text(function(d) { return d.score.best_synd_diff + " | " + (d.score.best_synd_diff ? d.score.best_weight : "0") })
+		.style("font-size", "20px")
+		.attr("x", 20)
+		// .transition()
+		// .duration(500)
+		.attr("y", function(d, i) { return 35 * i + 21})
+}
+
+// var {vv_column, cc_column, z_gen_column, x_gen_column } = renderCode(lt1)
+renderAll(lt1)
 
 </script>
 
@@ -618,5 +677,40 @@ var vv_column = vv_row.selectAll(".vv_qubit")
 [42,11,45,5,33,21],
 [11,34,46,31,7,18],
 [13,40,41,26,36,6],
+	]
+
+
+		var bit_nbhd = [
+	[5,7,10],
+	[0,7,11],
+	[2,5,8],
+	[4,5,6],
+	[1,6,11],
+	[1,2,7],
+	[2,3,11],
+	[0,1,5],
+	[0,3,10],
+	[4,8,10],
+	[9,10,11],
+	[2,6,9],
+	[0,8,9],
+	[4,7,9],
+	[3,6,8],
+	[1,3,4,]
+	]
+
+	var check_nbhd = [
+	[1,7,8,12],
+	[4,5,7,15],
+	[2,5,6,11],
+	[6,8,14,15],
+	[3,9,13,15],
+	[0,2,3,7],
+	[3,4,11,14],
+	[0,1,5,13],
+	[2,9,12,14],
+	[10,11,12,13],
+	[0,8,9,10],
+	[1,4,6,10],
 	]
  -->
