@@ -372,6 +372,15 @@ def compute_synd_matrix(ccode, xerror):
             
     return synd_matrix
 
+def compute_syndrome_weight(ccode, xerror, mask):
+    cdef int synd_weight = 0
+    synd = compute_synd_matrix(ccode, xerror)
+
+    for c1 in range(ccode.m):
+        for v2 in range(ccode.n):
+            synd_weight += synd[v2][c1]*mask[v2][c1]
+    return synd_weight
+
 ############ Gaussian elim ############
 
 def first_line_true(M, rank, j):
@@ -693,6 +702,6 @@ def run_algo_qcode(ccode, xerror, mask, logical2):
     (synd_weight,guessed_xerror) = decoder(ccode, synd_matrix, mask)
 
     if synd_weight != 0:
-        return 2
+        return 2, guessed_xerror
     else:
-        return int(logical2.test((xerror[0] + guessed_xerror[0], xerror[1] + guessed_xerror[1])))
+        return int(logical2.test((xerror[0] + guessed_xerror[0], xerror[1] + guessed_xerror[1]))), guessed_xerror

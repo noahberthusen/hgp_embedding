@@ -44,7 +44,7 @@ class Classical_code:
 
 
 def write_ccode(file_name, ccode):
-    f = open(file_name, 'a+')
+    f = open(file_name, 'w')
     f.write('n,' + str(ccode.n) + '\n')
     f.write('m,' + str(ccode.m) + '\n')
     f.write('dv,' + str(ccode.dv) + '\n')

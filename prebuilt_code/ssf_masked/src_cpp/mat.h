@@ -19,7 +19,7 @@ class mat{
     bool operator==(const mat<T>& rhs);
 
     void print() const;
-    void print_true() const;
+    void print_true(ostream& ostr) const;
 
     T* operator()(int rowNo) const;
     T& operator()(int rowNo, int colNo) const;
@@ -198,16 +198,16 @@ void mat<T>::compute_rref() {
 
 
 template<typename T>
-void mat<T>::print_true() const {
-    std::cout << "Matrix indices: " << std::endl;
+void mat<T>::print_true(ostream& ostr) const {
+    // ostr << "Matrix indices: " << std::endl;
     for (int i = 0; i < no_rows; i++) {
         for (int j = 0; j < no_cols; j++) {
-	    if ((*this)(i,j)) {
-		std::cout << "(" << i << "," << j << ") ";
-	    }
+            if ((*this)(i,j)) {
+                ostr << "(" << i << "," << j << ") ";
+            }
         }
     }
-    std::cout << std::endl;
+    // ostr << std::endl;
 }
 
 

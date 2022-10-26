@@ -57,6 +57,28 @@ mat<bool> generate_mask(double (p), int n, int m) {
     return mask;
 }
 
+mat<bool> generate_mask_from(mat<bool> mask, double p, int n, int m) {
+    int r1;
+
+    mat<bool> new_mask(n,m,true);
+    random_device rd;
+    mt19937 gen(rd());
+    bernoulli_distribution dis(p);
+
+    for (int a = 0; a < n; a++) {
+        for (int b = 0; b < m; b++) {
+            new_mask(a,b) = mask(a,b);
+            if (mask(a,b) == 0) {
+                r1 = dis(gen);
+                if (r1 == 1) {
+                    new_mask(a,b) = 1;
+                }
+            }
+        }
+    }
+    return new_mask;
+}
+
 mat<bool> vv(int t) {
     // (8,2) (8,8) (8,12) (13,6)
     mat<bool> errors(t,t,0);
@@ -129,17 +151,18 @@ int main(int argc, char * argv[]) {
     // Probabilities we want to run
     // vector<double> p {0.01};
     vector<double> proba_vector;
-    for (int k = 11; k < 51; ++k) {
+    for (int k = 1; k < 11; k+=2) {
             proba_vector.push_back(k*0.001);
     }
     vector<double> mask_vector;
-    for (int k = 3; k < 4; k++) {
-        mask_vector.push_back(k*0.1);
+    for (int k = 0; k < 2; k++) {
+       mask_vector.push_back(k*0.1);
     }
     vector<int> time_vector;
-    for (int k = 60; k < 61; k+=10) {
+    for (int k = 1500; k < 2100; k+=500) {
         time_vector.push_back(k);
     }
+
 
     int no_test = 300000;
     /////////////////////////////////////////
@@ -193,6 +216,7 @@ int main(int argc, char * argv[]) {
     int seed = time(NULL) + 123 * rand_seed;
     srand (seed);
     string res_file_name = string("../results/cpp_laptop_") + generate_id() + ".res";
+    string size_file_name = string("../results/size_") + generate_id() + ".txt";
     // string res_file_name = string("../results/cpp_laptop_") + "test.res";
 
 
@@ -225,75 +249,94 @@ int main(int argc, char * argv[]) {
 
 
     // ISD
-    
-    double p = 0.001;
 
-    ofstream size_file;
-    size_file.open("../results/size.res", std::ios_base::app);
+    // double p = 0.001;
+//    ofstream size_file;
+//    size_file.open(size_file_name, std::ios_base::app);
     for (int r = 0; r < no_test; r++) {
-        for (int mask_ind = 0; mask_ind < int(mask_vector.size()); mask_ind++) {
-            double p_mask = mask_vector[mask_ind];
-            mat<bool> synd_mask = generate_mask(p_mask, Q_ptr->n, Q_ptr->m);
+        for (int p_ind = 0; p_ind < int(proba_vector.size()); p_ind++) {
+            double p = proba_vector[p_ind];
+            for (int mask_ind = 0; mask_ind < int(mask_vector.size()); mask_ind++) {
+                double p_mask = mask_vector[mask_ind];
+                mat<bool> synd_mask = generate_mask(p_mask, Q_ptr->n, Q_ptr->m); // for everything but multiples of 100, ...
+                mat<bool> partial_synd_mask = generate_mask_from(synd_mask, 0.9, Q_ptr->n, Q_ptr->m); // for multiples of 100
+                mat<bool> partial_synd_mask2 = generate_mask_from(partial_synd_mask, 0.9, Q_ptr->n, Q_ptr->m);
+                // multiples of 1000 ....
 
-            for (int t_i = 0; t_i < int(time_vector.size()); t_i++) {
-                int t_ind = time_vector[t_i];
-                Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+                for (int t_i = 0; t_i < int(time_vector.size()); t_i++) {
+                    int t_ind = time_vector[t_i];
+                    Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
 
-                mat<bool> vv_errors(Q_ptr->n, Q_ptr->n, 0);
-                mat<bool> cc_errors(Q_ptr->m, Q_ptr->m, 0);
-                // begin incomplete syndrome decoding
-                for (int t = 0; t < t_ind; t++) {
-                    Decoder tmp_dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+                    mat<bool> vv_errors(Q_ptr->n, Q_ptr->n, 0);
+                    mat<bool> cc_errors(Q_ptr->m, Q_ptr->m, 0);
+
+                    // begin incomplete syndrome decoding
+    //                size_file << "(0,";
+                    for (int t = 1; t < t_ind+1; t++) {
+                        Decoder tmp_dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+
+                        vv_errors ^= generate_errors(p, Q_ptr->n);
+                        cc_errors ^= generate_errors(p, Q_ptr->m);
+
+    //                    if ((t % 1000) == 0) {
+    //                        tmp_dec.decode(vv_errors, cc_errors, partial_synd_mask2);
+    //                    } else if ((t % 100) == 0) {
+    //                        tmp_dec.decode(vv_errors, cc_errors, partial_synd_mask);
+    //                    } else {
+    //                        tmp_dec.decode(vv_errors, cc_errors, synd_mask);
+    //                    }
+
+                        tmp_dec.decode(vv_errors, cc_errors, synd_mask);
+
+                        vv_errors ^= tmp_dec.get_vv_correction();
+                        cc_errors ^= tmp_dec.get_cc_correction();
+
+    //                    int error_size =  vv_errors.count_nonzero() + cc_errors.count_nonzero();
+    //                    int synd_weight = tmp_dec.compute_syndrome_weight(vv_errors, cc_errors, synd_mask);
+
+    //                    if (synd_weight != 0) {
+    //                        size_file << error_size << "*);" << "(" << error_size << "*,";
+    //                    } else {
+    //                        size_file << error_size << ");" << "(" << error_size << "," ;
+    //                    }
+                    }
 
                     vv_errors ^= generate_errors(p, Q_ptr->n);
                     cc_errors ^= generate_errors(p, Q_ptr->m);
-                    // size_file << '(' << vv_errors.count_nonzero() + cc_errors.count_nonzero() << ',';
 
-                    tmp_dec.decode(vv_errors, cc_errors, synd_mask);
+                    dec.decode(vv_errors, cc_errors, generate_mask(0, Q_ptr->n, Q_ptr->m));
 
-                    vv_errors ^= tmp_dec.get_vv_correction();
-                    cc_errors ^= tmp_dec.get_cc_correction();
+                    vv_errors ^= dec.get_vv_correction();
+                    cc_errors ^= dec.get_cc_correction();
+    //                size_file << vv_errors.count_nonzero() + cc_errors.count_nonzero();
 
-                    // size_file << vv_errors.count_nonzero() + cc_errors.count_nonzero();
-                    // int synd_weight = tmp_dec.compute_syndrome_weight(vv_errors, cc_errors, synd_mask);
+                    if (dec.get_synd_weight() != 0) {
+                        res_ens.add_result(t_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, 0, 1);
+    //                     size_file << "*+)" << endl;
+                    } else {
+                        int success = Q_ptr->is_stabilizer(vv_errors,cc_errors);
+    //                    if (success) {
+    //                        size_file << ")" << endl;
+    //                    } else {
+    //                        size_file << "+)" << endl;
+    //                    }
 
-                    // if (synd_weight != 0) {
-                    //     size_file << "*),";
-                    // } else {
-                    //     size_file << "),";
-                    // }
+                        // res_ens.add_result(-k_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, success, 0);
+                        res_ens.add_result(t_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, success, 0);
+                    }
+                    res_ens.to_file(res_file_name);
                 }
-
-                vv_errors ^= generate_errors(p, Q_ptr->n);
-                cc_errors ^= generate_errors(p, Q_ptr->m);
-
-                // size_file << '(' << vv_errors.count_nonzero() + cc_errors.count_nonzero() << ',';
-                dec.decode(vv_errors, cc_errors, generate_mask(0, Q_ptr->n, Q_ptr->m));
-
-                vv_errors ^= dec.get_vv_correction();
-                cc_errors ^= dec.get_cc_correction();
-                // size_file << vv_errors.count_nonzero() + cc_errors.count_nonzero() << "):::::";
-
-                if (dec.get_synd_weight() != 0) {
-                    res_ens.add_result(t_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, 0, 1);
-                    // size_file << '0' << endl;
-                } else {
-                    int success = Q_ptr->is_stabilizer(vv_errors,cc_errors);
-                    // size_file << success << endl;
-
-                    // res_ens.add_result(-k_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, success, 0);
-                    res_ens.add_result(t_ind, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, success, 0);
-                }
-                res_ens.to_file(res_file_name);
             }
         }
     }
-    size_file.close();
-    
+//    size_file.close();
 
 
-    // General decoding
     /*
+    // General decoding
+    ofstream size_file;
+    size_file.open(size_file_name, std::ios_base::app);
+
     for (int r = 0; r < no_test; r++) {
         for (int proba_ind = 0; proba_ind < int(proba_vector.size()); ++ proba_ind) {
             double p = proba_vector[proba_ind];
@@ -305,18 +348,23 @@ int main(int argc, char * argv[]) {
                 double p_mask = mask_vector[mask_ind];
 
                 mat<bool> synd_mask = generate_mask(p_mask, Q_ptr->n, Q_ptr->m);
-
                 Decoder dec(Q_ptr->n,Q_ptr->m,Q_ptr->dv,Q_ptr->dc, Q_ptr->check_nbhd_ptr, Q_ptr->bit_nbhd_ptr);
+
+                int full_synd_weight = dec.compute_syndrome_weight(vv_errors, cc_errors, generate_mask(0, Q_ptr->n, Q_ptr->m));
+                int masked_synd_weight = dec.compute_syndrome_weight(vv_errors, cc_errors, synd_mask);
+
                 dec.decode(vv_errors, cc_errors, synd_mask);
-                
+
                 mat<bool> final_vv_errors = dec.get_vv_correction() ^ vv_errors;
                 mat<bool> final_cc_errors = dec.get_cc_correction() ^ cc_errors;
                 int synd_weight = dec.compute_syndrome_weight(final_vv_errors, final_cc_errors, generate_mask(0, Q_ptr->n, Q_ptr->m));
 
                 if (synd_weight != 0) {
                     res_ens.add_result(0, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, 0, 1);
+                    size_file << p << "," << p_mask << "," << 0 << "," << masked_synd_weight << "," << full_synd_weight << endl;
                 } else {
                     int success = Q_ptr->is_stabilizer(final_vv_errors,final_cc_errors);
+                    size_file << p << "," << p_mask << "," << success << "," << masked_synd_weight << "," << full_synd_weight << endl;
                     res_ens.add_result(0, Q_ptr->dv, Q_ptr->dc, Q_ptr->n, Q_ptr->m, Q_ptr->id, p, p_mask, 1, success, 0);
                 }
 
@@ -327,6 +375,7 @@ int main(int argc, char * argv[]) {
             }
         }
     }
+    size_file.close();
     */
 
     auto stop = chrono::high_resolution_clock::now();

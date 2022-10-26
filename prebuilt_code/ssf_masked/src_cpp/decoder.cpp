@@ -196,9 +196,6 @@ void Decoder::find_best_gen() {
         for (int v2 = 0; v2 < n; v2++) {
             synd_diff = (*lookup_table_ptr)(c1,v2)->get_best_synd_diff();
             weight = (*lookup_table_ptr)(c1,v2)->get_best_weight();
-            if (synd_diff/weight > 6) {
-                cout << synd_diff/weight << endl;
-            }
             if (best_synd_diff*weight < synd_diff*best_weight) {
                 best_gen[0] = c1;
                 best_gen[1] = v2;

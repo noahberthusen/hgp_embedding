@@ -11,8 +11,8 @@ import uuid
 #Run this file to generate classical codes
 
 ###################################################   
-n = 84
-m = 70
+n = 36
+m = 30
 dv = 5
 dc = 6
 no_codes = 1

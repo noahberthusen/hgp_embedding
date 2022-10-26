@@ -24,12 +24,12 @@ def read_code(f_name: str):
     """
 
     with open(f_name, 'r') as f:
-        n = int(f.readline())
-        m = int(f.readline())
-        dv = int(f.readline())
-        dc = int(f.readline())
+        n = int(f.readline().split(',')[1])
+        m = int(f.readline().split(',')[1])
+        dv = int(f.readline().split(',')[1])
+        dc = int(f.readline().split(',')[1])
         f.readline()
-
+        f.readline()
         bit_nbhd = []
         for i in range(n):
             nbhd = [int(c) for c in f.readline().strip(',\n').split(',')]

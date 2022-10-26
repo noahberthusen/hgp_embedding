@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="./data/48_40_5_6_cluster_size.res.js"></script>
+<div class="row">
+  <div class="column">
+    <input type="checkbox" class="checkbox-in" value="vis_in" checked><label>Visible in</label>
+    <input type="checkbox" class="checkbox-in" value="invis_in" checked><label>Invisible in</label>
+    <br>
+    <input type="checkbox" class="checkbox-out" value="vis_out" checked><label>Visible out</label>
+    <input type="checkbox" class="checkbox-out" value="invis_out" checked><label>Invisible out</label>
+    <br>
+    <input type="checkbox" class="checkbox" value="successes" checked><label>Successes</label>
+    <input type="checkbox" class="checkbox" value="failures" checked><label>Failures</label>
+    <br>
+    <label>Time step</label>
+    <input type="number" min="0" max=201 step="1" value="0" id="timeStep">
+  </div>
+  <div class="column">
+    <div id="more_data"></div>
+  </div>
+</div>
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz" style="text-align: center"></div>
+
+<style>
+  .row {
+    display: flex;
+  }
+
+  .column {
+    flex: 50%;
+  }
+  .tooltip {
+    position: absolute;
+    width: 130px
+    /* pointer-events: none; */
+    /* background: #000;
+    color: #fff; */
+  }
+</style>
+<script>
+
+  var margin = {top: 50, right: 50, bottom: 50, left: 50},
+    width = 600 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+  orig_data = heatmap_data.data
+  total_samples = heatmap_data.tot
+  dim = heatmap_data.dim
+
+  var render = function(data) {
+    d3.select('#my_dataviz').selectAll("*").remove() // why
+    d3.select('#more_data').selectAll("*").remove() // why
+
+
+    const myColor = d3.scaleLog()
+      .domain([1e-10, total_samples])
+      .range(["white", "#00A7FF"])
+      // .range(d3.interpolateRgb.gamma(2.2))
+      // .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"])
+      // .range(d3.quantize(d3.interpolateHcl("#fafa6e", "#2A4858"), 10))
+
+
+    var tooltip = d3.select("#my_dataviz")
+      .append("div")
+      .style("opacity", 0)
+      .attr("class", "tooltip")
+      .style("background-color", "white")
+      .style("border", "solid")
+      .style("border-width", "2px")
+      .style("border-radius", "5px")
+      .style("padding", "5px")
+
+    // Three function that change the tooltip when user hover / move / leave a cell
+    var mouseover = function(d) {
+      tooltip.style("opacity", 1)
+    }
+    var mousemove = function(d) {
+      tooltip
+        .html("Number of occurances: " + ((d.value == 1e-10) ? "0" : d.value) + "/" + total_samples)
+        .style("left", (d3.mouse(this)[0]+260) + "px")
+        .style("top", (d3.mouse(this)[1]+60) + "px")
+    }
+    var mouseleave = function(d) {
+      tooltip.style("opacity", 0)
+    }
+
+    var stats = d3.select("#more_data")
+      .append("svg")
+        .attr("width", 500)
+        .attr("height", 100)
+      .append("g")
+    stats
+      .append("text")
+      .text("invis_in --> invis_out: " + tots["invis_to_invis"] + "/" + data.tot)
+      .attr("x", 20)
+      .attr("y", 15)
+    stats
+      .append("text")
+      .text("invis_in --> vis_out: " + tots["invis_to_vis"] + "/" + data.tot)
+      .attr("x", 20)
+      .attr("y", 35)
+    stats
+      .append("text")
+      .text("vis_in --> invis_out: " + tots["vis_to_invis"] + "/" + data.tot)
+      .attr("x", 20)
+      .attr("y", 55)
+    stats
+      .append("text")
+      .text("vis_in --> vis_out: " + tots["vis_to_vis"] + "/" + data.tot)
+      .attr("x", 20)
+      .attr("y", 75)
+
+
+    var heatmap = d3.select("#my_dataviz")
+      .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+      // .call(d3.zoom().on("zoom", function () {
+      //    code.attr("transform", d3.event.transform)
+      // }))
+      // .append("g")
+
+    var x = d3.scaleLinear()
+      .range([0, height])
+      .domain([0, data.heatmap.length-1])
+
+      
+    heatmap.append("g")
+      .style("font-size", 15)
+      .attr("transform", "translate(0,11)")
+
+      .call(d3.axisLeft(x).tickSize(0))
+      .select(".domain").remove()
+
+    var y = d3.scaleLinear()
+      .range([0, width])
+      .domain([0, data.heatmap.length-1]);
+    heatmap.append("g")
+      .style("font-size", 15)
+      .attr("transform", "translate(11,0)")
+
+      .call(d3.axisTop(y).tickSize(0))
+      .select(".domain").remove()
+    
+    heatmap.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", width/2 + margin.left)
+      .attr("y", -30)
+      .text("# errors out");
+    
+    heatmap.append("text")
+      .attr("text-anchor", "end")
+      .attr("transform", "rotate(-90)")
+      .attr("y", -margin.left + 10)
+      .attr("x", -height/2 + margin.top - 20)
+      .text("# errors in")
+
+
+    var row = heatmap
+      .selectAll(".row")
+      .data(data.heatmap)
+      .enter()
+      .append("g")
+      .attr("class", "row");
+    
+    var cell = row.selectAll(".cell")
+      .data(function (d,i) {return d.map(function(a){ return {value: (a > 1e-10) ? a : 1e-10, row: i} })})
+      .enter().append("rect")
+      .attr("class", "cell")
+      .attr("x", function(d, i) { return x(i); })
+      .attr("y", function(d, i) { return y(d.row); })
+      .attr("width", x(1))
+      .attr("height", y(1))
+      .style("fill", function (d) { return myColor(d.value) })
+      .style("stroke", "#222")
+      .on("mouseover", mouseover)
+      .on("mousemove", mousemove)
+      .on("mouseleave", mouseleave)
+
+  }
+
+  
+
+  var update = function(data) {
+    data = orig_data[current_ind]
+    data_in = []
+    data_out = []
+    outcomes = []
+
+    d3.selectAll(".checkbox-in").each(function(d) {
+      cb = d3.select(this);
+      val = cb.property("value")
+
+      if(cb.property("checked")){
+        data_in.push(val)
+      }
+    })
+
+    d3.selectAll(".checkbox-out").each(function(d) {
+      cb = d3.select(this)
+      val = cb.property("value")
+
+      if(cb.property("checked")){
+        data_out.push(val)
+      }
+    })
+
+    d3.selectAll(".checkbox").each(function(d) {
+      cb = d3.select(this);
+      val = cb.property("value")
+
+      if(cb.property("checked")){
+        outcomes.push(val)
+      }
+    })
+
+    if (!data_in.length || !data_out.length || !outcomes.length) { return }
+
+    invis_to_invis = false
+    invis_to_vis = false
+    vis_to_invis = false
+    vis_to_vis = false
+    successes = false
+    failures = false
+
+    if (data_in.includes("invis_in")) {
+      invis_to_invis = true
+      invis_to_vis = true
+    }
+    if (data_in.includes("vis_in")) {
+      vis_to_invis = true
+      vis_to_vis = true
+    }
+    if (!data_out.includes("invis_out")) {
+      invis_to_invis = false
+      vis_to_invis = false
+    }
+    if (!data_out.includes("vis_out")) {
+      invis_to_vis = false
+      vis_to_vis = false
+    }
+    if (outcomes.includes("successes")) {
+      successes = true
+    }
+    if (outcomes.includes("failures")) {
+      failures = true
+    }
+
+    var tmp_heatmap = Array(dim).fill().map(() => Array(dim).fill(0));
+    tot = 0
+    var add_to_array = function(arr1, arr2) {
+      var tmp = Array(dim).fill().map(() => Array(dim).fill(0));
+      for (var i = 0; i < dim; i++) {
+        for (var j = 0; j < dim; j++) {
+          tmp[i][j] = arr1[i][j] + arr2[i][j]
+        }
+      }
+      return tmp
+    }
+
+    tots = {
+      "invis_to_invis": 0,
+      "invis_to_vis": 0,
+      "vis_to_invis": 0,
+      "vis_to_vis": 0
+    }
+
+    if (invis_to_invis) { 
+      if (successes) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.invis_to_invis.successes.heatmap)
+        tot += data.invis_to_invis.successes.tot
+        tots["invis_to_invis"] += data.invis_to_invis.successes.tot
+      }
+      if (failures) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.invis_to_invis.failures.heatmap)
+        tot += data.invis_to_invis.failures.tot
+        tots["invis_to_invis"] += data.invis_to_invis.failures.tot
+      }
+    }
+    if (invis_to_vis) {
+      if (successes) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.invis_to_vis.successes.heatmap)
+        tot += data.invis_to_vis.successes.tot
+        tots["invis_to_vis"] += data.invis_to_vis.successes.tot
+      }
+      if (failures) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.invis_to_vis.failures.heatmap)
+        tot += data.invis_to_vis.failures.tot
+        tots["invis_to_vis"] += data.invis_to_vis.failures.tot
+      }
+    }
+    if (vis_to_invis) {
+      if (successes) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.vis_to_invis.successes.heatmap)
+        tot += data.vis_to_invis.successes.tot
+        tots["vis_to_invis"] += data.vis_to_invis.successes.tot
+      }
+      if (failures) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.vis_to_invis.failures.heatmap)
+        tot += data.vis_to_invis.failures.tot
+        tots["vis_to_invis"] += data.vis_to_invis.failures.tot
+      }
+    }
+    if (vis_to_vis) {
+      if (successes) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.vis_to_vis.successes.heatmap)
+        tot += data.vis_to_vis.successes.tot
+        tots["vis_to_vis"] += data.vis_to_vis.successes.tot
+      }
+      if (failures) {
+        tmp_heatmap = add_to_array(tmp_heatmap, data.vis_to_vis.failures.heatmap)
+        tot += data.vis_to_vis.failures.tot
+        tots["vis_to_vis"] += data.vis_to_vis.failures.tot
+      }
+    }
+    render({ heatmap: tmp_heatmap, tot: tot, tots: tots })
+  }
+
+  current_ind = 0
+  d3.selectAll(".checkbox-in").on("change", update);
+  d3.selectAll(".checkbox-out").on("change", update);
+  d3.selectAll(".checkbox").on("change", update);
+
+  d3.select("#timeStep").on("input", function() {
+    current_ind = this.value
+    update() 
+  })
+  update()
+  
+</script>

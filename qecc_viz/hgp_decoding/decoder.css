@@ -1,0 +1,17 @@
+div#halfpage{
+    height: 600px;
+    width: 167;
+    overflow-y: auto;
+    }
+    svg#sky {
+      width: 150;
+   }
+
+
+.container {
+   padding-top: 50px;
+}
+
+.row {
+   padding-bottom: 5px;
+}

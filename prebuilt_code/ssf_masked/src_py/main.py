@@ -25,11 +25,11 @@ dc_list = []
 # id_list = ["swap_566a5203","swap_21c6740d","swap_ca41e16b","swap_a501cc2e","swap_12f5a4a2", "swap_82698d8d", "swap_2e55c0b2", "swap_877f956a", "swap_54d39ebd", "swap_b5f4dc91","swap_c9cc9a21","swap_5ca99d9d","swap_3975e341","swap_dee99e3d","swap_8cab59e4", "swap_48aae4fa","swap_24daeba6","swap_0c8ee978","swap_3deb9a09","swap_48aae4fa","swap_93d4cf34"]
 # id_list = ["swap_ede32c1d","swap_6fb0da08"]
 id_list = []
-file_name_list = ["../ccode/36_30_5_6.code"]
+# file_name_list = ["../ccode/36_30_5_6.code"]
 # file_name_list = ["../ccode/swap3_120_100_5_6.code"]
 # file_name_list = ["../ccode/20_15_3_4.code"]
 # file_name_list = ["../ccode/7_3_1_4.code"]
-# file_name_list = ["../ccode/16_12_3_4.code"]
+file_name_list = ["../ccode/16_12_3_4.code"]
 
 ###########################################################
 # Simulation parameters
@@ -100,12 +100,13 @@ def main_laptop():
                 no_stop = 0
                 rs = []
                 for test in range(no_runs):
-                    error = decoder.random_error(ccode, p)
+                    # error = decoder.random_error(ccode, p)
+                    error = decoder.random_sized_error(ccode, 2)
                     mask = decoder.random_mask(ccode, p_mask)
                     print_erase.print(str(p*100) + "% " + str(p_mask*100) + "% : " + "Run number: " + str(test+1) + "/" + str(no_runs) + "\tResult: " + str(no_success) + " (" + str(no_stop) + " :synd != 0)")
                     res = run_algo(algo, ccode, error, mask, logical2, 2)
                     if res == 2:
-                        # print('2', error)
+                        print('2', error)
                         r = Result(algo,ccode.dv,ccode.dc,ccode.n,ccode.m,ccode.id,p,p_mask,1,0,1)
                     else:
                         # if (not res):

@@ -23,7 +23,10 @@ def ccode_file_name(n,m,dv,dc,swap):
 # When we run simulations
 ###################################################
 # File where the result is stored
-res_file_name = res_dir + "/py_laptop_" + str(uuid.uuid4())[:8] + ".res"
+id = str(uuid.uuid4())[:8]
+res_file_name = res_dir + "/py_laptop_" + id + ".res"
+cluster_size_file_name = res_dir + "/cluster_size_" + id + ".res"
+error_size_file_name = res_dir + "/error_size_" + id + ".res"
 
 ###################################################
 # When we create a summary of the results
