@@ -6,10 +6,10 @@ codes = [
     # "24_20_5_6",
     # "30_25_5_6",
     # "36_30_5_6",
-    # "42_35_5_6",
+    "swap3_42_35_5_6",
     # "48_40_5_6",
     # "60_50_5_6",
-    "72_60_5_6",
+    # "72_60_5_6",
     # "84_70_5_6"
 ]
 
@@ -19,8 +19,8 @@ path, filename = os.path.split(full_path)
 for code in codes:
     df = pd.read_csv(os.path.join(path, f'./{code}/iterative_tmp.res'), sep=',|\s+', engine='python')
     merged_df = pd.DataFrame(columns=df.columns)
-    t_max = 3501
-    p_masks = np.linspace(0, 0.4, 41)
+    t_max = 4001
+    p_masks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
     for i, p in enumerate(p_masks):
         for t in range(t_max):
             ind = i*t_max + t

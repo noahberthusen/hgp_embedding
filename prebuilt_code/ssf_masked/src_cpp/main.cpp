@@ -151,15 +151,15 @@ int main(int argc, char * argv[]) {
     // Probabilities we want to run
     // vector<double> p {0.01};
     vector<double> proba_vector;
-    for (int k = 1; k < 11; k+=2) {
+    for (int k = 1; k < 2; k+=2) {
             proba_vector.push_back(k*0.001);
     }
     vector<double> mask_vector;
-    for (int k = 0; k < 2; k++) {
+    for (int k = 4; k < 5; k++) {
        mask_vector.push_back(k*0.1);
     }
     vector<int> time_vector;
-    for (int k = 1500; k < 2100; k+=500) {
+    for (int k = 1000; k < 1100; k+=500) {
         time_vector.push_back(k);
     }
 

@@ -1,17 +1,17 @@
 from turtle import numinput
 from classical_code import read_code
 import numpy as np
-# import galois as GF
+import os
 
 codes = [
-    # "24_20_5_6",
+    # "swap3_24_20_5_6",
     # "30_25_5_6",
-    # "36_30_5_6",
-    # "42_35_5_6",
+    "swap3_36_30_5_6",
+    "swap3_42_35_5_6",
     # "48_40_5_6",
     # "60_50_5_6",
-    # "72_60_5_6"
-    "84_70_5_6"
+    # "72_60_5_6",
+    # "swap3_84_70_5_6"
 ]
 distances = []
 
@@ -67,9 +67,12 @@ def rref(H):
         r += 1
     return H
 
+full_path = os.path.realpath(__file__)
+path, filename = os.path.split(full_path)
+
 num_iters = 1000
 for i, code in enumerate(codes):
-    file = f'./prebuilt_code/ssf_masked/ccode/{code}.code'
+    file = os.path.join(path, f'./prebuilt_code/ssf_masked/ccode/{code}.code')
     ccode = read_code(file)
     d = ccode.n
     n = ccode.n
