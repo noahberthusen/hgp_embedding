@@ -7,23 +7,34 @@ import matplotlib
 import math
 import random
 from scipy.optimize import curve_fit
-from sklearn.metrics import r2_score
 import os
 
 codes = [
-    "24_20_5_6",
+    # "24_20_5_6",
     "30_25_5_6",
     "36_30_5_6",
     # "swap3_42_35_5_6",
-    "42_35_5_6",
-    "48_40_5_6",
+    # "42_35_5_6",
+    "swap3_48_40_5_6",
     "60_50_5_6",
     "72_60_5_6",
-    "84_70_5_6"
+    # "swap3_84_70_5_6",
+    # "84_70_5_6"
 ]
 
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+plt.rc('font', family='serif')
+# plt.rcParams['xtick.direction'] = 'in'
+# plt.rcParams['ytick.direction'] = 'in'
+plt.rcParams['axes.linewidth'] = 1
+# colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+colors = [(64, 83, 211), (221, 179, 16), (181, 29, 20), (0, 190, 255), (251, 73, 176), (0, 178, 93)]
+# colors = [(239, 230, 69), (233, 53, 161), (0, 227, 255), (225, 86, 44), (83, 126, 255), (0, 203, 133)]
+# colors = [(86, 100, 26), (192, 175, 251), (230, 161, 118), (0, 103, 138), (152, 68, 100), (94, 204, 171)]
+colors = [(c[0]/255, c[1]/255, c[2]/255) for c in colors]
+# colors = sns.color_palette("hls", 6)
+# colors = sns.color_palette("Set2", 6)
 
+distances = np.array([8, 12, 16, 18, 20])
 
 full_path = os.path.realpath(__file__)
 path, filename = os.path.split(full_path)
@@ -67,7 +78,7 @@ def plot(ax, p_masks, plot_ind):
     params = np.array(params)
     errors = np.array(errors)
 
-    distances = np.array([6, 8, 12, 14, 16, 18, 20, 23])
+    
 
     def exp_fun(x, c, V):
         return c / (np.abs(V)**((x+1)/2))
@@ -150,8 +161,6 @@ def plot_both(ax, plot_ind):
     params = np.array(params)
     errors = np.array(errors)
 
-    distances = np.array([6, 8, 12, 14, 16, 18, 20, 23])
-
     def exp_fun(x, c, V):
         return c / (np.abs(V)**((x+1)/2))
     def fun(x, c, V):
@@ -187,16 +196,15 @@ def plot_both(ax, plot_ind):
             # ax[plot_ind].set_xlabel('Distance, $d$')
 
 
-fig =  plt.figure(figsize=(14,5))
-# plot_both(ax, 0)
-# plot_both(ax, 1)
-ax1 = fig.add_subplot(1,4,1)
-ax2 = fig.add_subplot(1,4,2)
+fig =  plt.figure(figsize=(13,5))
 
-ax3 = fig.add_subplot(2,4,3)
-ax4 = fig.add_subplot(2,4,4)
-ax5 = fig.add_subplot(2,4,7)
-ax6 = fig.add_subplot(2,4,8)
+ax1 = plt.subplot(141)
+ax2 = plt.subplot(142, sharey=ax1)
+
+ax3 = plt.subplot(243)
+ax4 = plt.subplot(244)
+ax5 = plt.subplot(247)
+ax6 = plt.subplot(248)
 
 plot_both([ax1, ax2], 0)
 plot_both([ax1, ax2], 1)
