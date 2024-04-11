@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 from scipy.optimize import curve_fit
-from sklearn.metrics import r2_score
-import seaborn as sns
+# from sklearn.metrics import r2_score
+# import seaborn as sns
 
 plt.rc('font', family='serif')
 # plt.rcParams['xtick.direction'] = 'in'
@@ -15,7 +15,7 @@ fig, ax = plt.subplots(2, 1, figsize=(5,5.5), sharey=True, sharex=True, gridspec
 full_path = os.path.realpath(__file__)
 path, filename = os.path.split(full_path)
 
-df = pd.read_csv(os.path.join(path, '../../prebuilt_code/ssf_masked/results/naive_scheduling/swap3_48_40_5_6/iterative_masked_decoding.res'))
+df = pd.read_csv(os.path.join(path, '../../src/results/naive_scheduling/swap3_48_40_5_6/iterative_masked_decoding.res'))
 df['p_error'] = 1 - df['p_log']
 df['p_std_dev'] = np.sqrt(df['p_error'] * df['p_log'] / df['no_test'])
 # df['p_std_dev'].replace(to_replace=0, value=1e-2, inplace=True)
@@ -39,7 +39,7 @@ for i, j in enumerate(p_masks):
         tmp_df = df[(df['p_mask'] == j) & (df['algo'] >= 200) & (df['p_std_dev'] > 0)]
     else:
         tmp_df = df[(df['p_mask'] == j) & (df['algo'] >= 300) & (df['p_std_dev'] > 0)]
-    
+
     df = df[df['algo'].isin(xs)]
     tmp_df_fit = df[(df['p_mask'] == j) & (df['algo'] >= 300)]
     tmp_df_before = df[(df['p_mask'] == j) & (df['algo'] < 300)]
@@ -89,7 +89,7 @@ params = []
 sched = "naive_scheduling"
 
 for i, code in enumerate(codes):
-    df = pd.read_csv(os.path.join(path, f'../../prebuilt_code/ssf_masked/results/{sched}/{code}/iterative_masked_decoding.res'))
+    df = pd.read_csv(os.path.join(path, f'../../src/results/{sched}/{code}/iterative_masked_decoding.res'))
     df['p_error'] = 1 - df['p_log']
     df['p_std_dev'] = np.sqrt(df['p_error'] * df['p_log'] / df['no_test'])
 
@@ -107,7 +107,7 @@ for i, code in enumerate(codes):
         tmp_df_fit = df[(df['p_mask'] == k) & (df['algo'] >= 300)]
         tmp_df_before = df[(df['p_mask'] == k) & (df['algo'] < 300)]
 
-        ax[1].errorbar(tmp_df_fit['algo'], tmp_df_fit['p_error'], tmp_df_fit['p_std_dev'], 
+        ax[1].errorbar(tmp_df_fit['algo'], tmp_df_fit['p_error'], tmp_df_fit['p_std_dev'],
             fmt='o', c=colors[i], label=f"[[{code_sizes[i]},{log_qbs[i]},{distances[i]}]]")
         ax[1].errorbar(tmp_df_before['algo'], tmp_df_before['p_error'], tmp_df_before['p_std_dev'], fmt='x', alpha=0.8, c=colors[i])
 
@@ -136,4 +136,4 @@ ax[1].text(-.2,.95,'(b)', transform=ax[1].transAxes, fontsize=16)
 plt.tight_layout()
 # plt.show()
 
-plt.savefig(os.path.join(path, '../rounds_v_ler.png'), dpi=1000, transparent=False, bbox_inches='tight')
+plt.savefig(os.path.join(path, '../rounds_v_ler.pdf'), format="pdf", dpi=1000, transparent=False, bbox_inches='tight')

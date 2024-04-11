@@ -53,7 +53,7 @@ def plot(ax, p_masks, plot_ind):
     errors = [[] for code in codes]
 
     for i, code in enumerate(codes):
-        df = pd.read_csv(os.path.join(path, f'../../prebuilt_code/ssf_masked/results/{sched}/{code}/iterative_masked_decoding.res'))
+        df = pd.read_csv(os.path.join(path, f'../../src/results/{sched}/{code}/iterative_masked_decoding.res'))
         df['p_error'] = 1 - df['p_log']
         df['p_std_dev'] = np.sqrt(df['p_error'] * df['p_log'] / df['no_test'])
         df['p_std_dev'].replace(to_replace=0, value=1e-2, inplace=True)
@@ -78,7 +78,7 @@ def plot(ax, p_masks, plot_ind):
     params = np.array(params)
     errors = np.array(errors)
 
-    
+
 
     def exp_fun(x, c, V):
         return c / (np.abs(V)**((x+1)/2))
@@ -106,7 +106,7 @@ def plot(ax, p_masks, plot_ind):
 
             ax.set_yscale('log')
 
-            
+
             # if (j == 0.3 or j == 0.4):
                 # ax.set_yticks([0.001])
                 # ax.set_yticklabels(["$10^{-3}$"])
@@ -136,7 +136,7 @@ def plot_both(ax, plot_ind):
     errors = [[] for code in codes]
 
     for i, code in enumerate(codes):
-        df = pd.read_csv(os.path.join(path, f'../../prebuilt_code/ssf_masked/results/{sched}/{code}/iterative_masked_decoding.res'))
+        df = pd.read_csv(os.path.join(path, f'../../src/results/{sched}/{code}/iterative_masked_decoding.res'))
         df['p_error'] = 1 - df['p_log']
         df['p_std_dev'] = np.sqrt(df['p_error'] * df['p_log'] / df['no_test'])
         df['p_std_dev'].replace(to_replace=0, value=1e-2, inplace=True)
@@ -233,5 +233,5 @@ ax6.text(-.17,1,'(f)', transform=ax6.transAxes, fontsize=16)
 fig.supxlabel('Distance, $d$', fontsize=10)
 
 # plt.show()
-plt.savefig(os.path.join(path, '../lambda3.png'), dpi=1000, transparent=False, bbox_inches='tight')
+plt.savefig(os.path.join(path, '../lambda3.pdf'), format="pdf", dpi=1000, transparent=False, bbox_inches='tight')
 
