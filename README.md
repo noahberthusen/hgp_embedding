@@ -1,4 +1,4 @@
-[![Paper](https://img.shields.io/badge/paper-arXiv%3A1912.12002-B31B1B.svg)](https://arxiv.org/abs/2306.17122)
+[![Paper](https://img.shields.io/badge/paper-arXiv%3A2306.17122-B31B1B.svg)](https://arxiv.org/abs/2306.17122)
 
 # Partial Syndrome Measurement for Hypergraph Product Codes
 
